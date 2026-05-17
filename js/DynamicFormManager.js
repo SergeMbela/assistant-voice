@@ -11,6 +11,7 @@ export class DynamicFormManager {
 
         this.options = {
             externalApiUrl: options.externalApiUrl || '',
+            apiKey: options.apiKey || '', // Ajout du support de l'API Key
             onStateChange: options.onStateChange || null,
             onSubmit: options.onSubmit || null,
             onFieldAdd: options.onFieldAdd || null,
@@ -116,7 +117,63 @@ export class DynamicFormManager {
                 break;
         }
 
+        // Gestion de la répétitivité (ex: pour ajouter plusieurs codes CIM10)
+        if (field.repeatable) {
+            this._addRepeatButton(field, wrapper, sectionId);
+        }
+
         return wrapper;
+    }
+
+    _addRepeatButton(field, wrapper, sectionId) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-repeat';
+        btn.innerHTML = '<span>+</span> Ajouter un autre';
+        btn.style.marginTop = '8px';
+        btn.style.fontSize = '0.8rem';
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.gap = '5px';
+        btn.style.cursor = 'pointer';
+        btn.style.background = 'transparent';
+        btn.style.border = '1px dashed var(--primary, #175b62)';
+        btn.style.color = 'var(--primary, #175b62)';
+        btn.style.padding = '4px 12px';
+        btn.style.borderRadius = '15px';
+
+        btn.onclick = () => {
+            const newId = `${field.id}_${Date.now()}`;
+            const newField = { ...field, id: newId, value: '', label: '', repeatable: false };
+            const newFieldEl = this.createField(newField, sectionId);
+            newFieldEl.style.marginTop = '8px';
+            
+            // On ajoute un bouton de suppression pour le nouveau champ
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '&times;';
+            removeBtn.className = 'btn-remove-field';
+            removeBtn.style.marginLeft = '10px';
+            removeBtn.style.color = 'red';
+            removeBtn.style.border = 'none';
+            removeBtn.style.background = 'transparent';
+            removeBtn.style.cursor = 'pointer';
+            removeBtn.onclick = () => {
+                newFieldEl.remove();
+                delete this.formState[newId];
+            };
+            
+            // On cherche le label ou l'input pour y accoler la croix
+            const input = newFieldEl.querySelector('input, select, textarea');
+            if (input) {
+                input.style.width = 'calc(100% - 30px)';
+                input.style.display = 'inline-block';
+                input.after(removeBtn);
+            }
+
+            btn.before(newFieldEl);
+        };
+
+        wrapper.appendChild(btn);
     }
 
     _createCheckboxField(field, wrapper, labelText) {
@@ -461,11 +518,27 @@ export class DynamicFormManager {
 
         try {
             const separator = field.source.includes('?') ? '&' : '?';
+            const headers = { 'Content-Type': 'application/json' };
+            if (this.options.apiKey) {
+                headers['X-API-Key'] = this.options.apiKey;
+            }
+
             const response = await fetch(
                 `${field.source}${separator}q=${encodeURIComponent(query)}`,
-                { signal: this.autocompleteAbortController.signal }
+                { 
+                    signal: this.autocompleteAbortController.signal,
+                    headers: headers
+                }
             );
             const results = await response.json();
+
+            // Affichage des résultats sous forme de JSON brut dans le conteneur technique de l'application
+            const vectorContent = document.getElementById('vector-json-content');
+            const vectorContainer = document.getElementById('vector-json-container');
+            if (vectorContent && vectorContainer) {
+                vectorContent.textContent = JSON.stringify(results, null, 2);
+                vectorContainer.classList.remove('hidden');
+            }
 
             this.renderAutocompleteResults(results, listbox, event.target, field, sectionId);
         } catch (err) {
@@ -488,12 +561,28 @@ export class DynamicFormManager {
             li.setAttribute('role', 'option');
             li.setAttribute('tabindex', '-1');
             li.dataset.index = index;
-            li.textContent = item.label || item.name || (typeof item === 'string' ? item : JSON.stringify(item));
+
+            // Formater le texte d'affichage: [code] label
+            let displayText = '';
+            const code = item.loinc || item.code || item.id;
+            const label = item.label || item.name || item.text;
+
+            if (code && label) {
+                // Si le label contient déjà le code, on ne le répète pas
+                displayText = label.includes(code) ? label : `[${code}] ${label}`;
+            } else {
+                displayText = label || code || (typeof item === 'string' ? item : JSON.stringify(item));
+            }
+
+            li.textContent = displayText;
 
             li.addEventListener('click', () => {
-                input.value = item.label || item.name || '';
+                input.value = displayText;
                 listbox.hidden = true;
-                this.addNewFieldToSection(item, sectionId);
+                
+                // On passe l'objet formaté à addNewFieldToSection
+                const formattedItem = { ...item, label: displayText };
+                this.addNewFieldToSection(formattedItem, sectionId);
             });
 
             listbox.appendChild(li);
@@ -591,50 +680,70 @@ export class DynamicFormManager {
 
         // Collect checkboxes
         this.container.querySelectorAll('input[type="checkbox"]').forEach(input => {
+            const wrapper = input.closest('[data-field-id]');
+            const labelEl = this.container.querySelector(`label[for="${input.id}"]`);
             data.fields.push({
                 id: input.id || input.name,
                 type: 'checkbox',
-                value: input.checked
+                value: input.checked,
+                label: labelEl ? labelEl.textContent.replace(' [?]', '').trim() : '',
+                section_id: wrapper ? wrapper.dataset.sectionId : ''
             });
         });
 
         // Collect text inputs
         this.container.querySelectorAll('input[type="text"]').forEach(input => {
             if (!input.id && !input.name) return;
+            const wrapper = input.closest('[data-field-id]');
+            const labelEl = this.container.querySelector(`label[for="${input.id}"]`);
             data.fields.push({
                 id: input.id || input.name,
                 type: 'text',
-                value: input.value
+                value: input.value,
+                label: labelEl ? labelEl.textContent.trim() : '',
+                section_id: wrapper ? wrapper.dataset.sectionId : ''
             });
         });
 
         // Collect number inputs
         this.container.querySelectorAll('input[type="number"]').forEach(input => {
             if (!input.id && !input.name) return;
+            const wrapper = input.closest('[data-field-id]');
+            const labelEl = this.container.querySelector(`label[for="${input.id}"]`);
             data.fields.push({
                 id: input.id || input.name,
                 type: 'number',
-                value: input.value === '' ? '' : parseFloat(input.value)
+                value: input.value === '' ? '' : parseFloat(input.value),
+                label: labelEl ? labelEl.textContent.trim() : '',
+                section_id: wrapper ? wrapper.dataset.sectionId : ''
             });
         });
 
         // Collect textareas
         this.container.querySelectorAll('textarea').forEach(textarea => {
             if (!textarea.id && !textarea.name) return;
+            const wrapper = textarea.closest('[data-field-id]');
+            const labelEl = this.container.querySelector(`label[for="${textarea.id}"]`);
             data.fields.push({
                 id: textarea.id || textarea.name,
                 type: 'textarea',
-                value: textarea.value
+                value: textarea.value,
+                label: labelEl ? labelEl.textContent.trim() : '',
+                section_id: wrapper ? wrapper.dataset.sectionId : ''
             });
         });
 
         // Collect selects
         this.container.querySelectorAll('select').forEach(select => {
             if (!select.id && !select.name) return;
+            const wrapper = select.closest('[data-field-id]');
+            const labelEl = this.container.querySelector(`label[for="${select.id}"]`);
             data.fields.push({
                 id: select.id || select.name,
                 type: 'select',
-                value: select.value
+                value: select.value,
+                label: labelEl ? labelEl.textContent.trim() : '',
+                section_id: wrapper ? wrapper.dataset.sectionId : ''
             });
         });
 
@@ -684,9 +793,14 @@ export class DynamicFormManager {
         }
 
         try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (this.options.apiKey) {
+                headers['X-API-Key'] = this.options.apiKey;
+            }
+
             const response = await fetch(this.options.externalApiUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: headers,
                 body: JSON.stringify(payload)
             });
             return await response.json();

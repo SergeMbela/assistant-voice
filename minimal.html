@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AksantiNet - Assistant Minimal</title>
+    <meta name="description" content="Interface simplifiée pour l'analyse médicale vocale et visuelle.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Cornerstone & DICOM Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dicom-parser/dist/dicomParser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cornerstone-core/dist/cornerstone.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cornerstone-math/dist/cornerstoneMath.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cornerstone-wado-image-loader/dist/cornerstoneWADOImageLoader.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cornerstone-web-image-loader/dist/cornerstoneWebImageLoader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cornerstone-tools/dist/cornerstoneTools.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩺</text></svg>">
+    <script type="importmap">
+    {
+      "imports": {
+        "axios": "https://cdn.jsdelivr.net/npm/axios@1.6.2/+esm",
+        "@json-editor/json-editor": "https://cdn.jsdelivr.net/npm/@json-editor/json-editor@2.11.0/+esm"
+      }
+    }
+    </script>
+    <style>
+        /* Ajustements pour la version minimale */
+        .app-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        main {
+            padding-top: 20px;
+        }
+        header {
+            justify-content: center;
+        }
+        .header-actions {
+            position: absolute;
+            right: 20px;
+        }
+
+        /* Style Rapport Médical Officiel */
+        .report-container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            color: #2c3e50;
+            line-height: 1.6;
+            font-family: 'Inter', sans-serif;
+            border-top: 5px solid var(--primary);
+        }
+        .report-header {
+            border-bottom: 2px solid #eee;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .report-section {
+            margin-bottom: 25px;
+        }
+        .report-section h3 {
+            color: var(--primary);
+            font-size: 1.1rem;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .explanation-box {
+            background: #f0f7ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .critical-note {
+            background: #fff5f5;
+            border: 1px solid #feb2b2;
+            color: #c53030;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+        @media print {
+            /* Cacher tout sauf le rapport */
+            body * {
+                visibility: hidden;
+            }
+            #report-content, #report-content * {
+                visibility: visible;
+            }
+            #report-content {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 0;
+                margin: 0;
+                filter: grayscale(100%); /* Force le noir et blanc */
+                color: black !important;
+            }
+            /* Supprimer les ombres et arrondis pour le PDF */
+            .medical-report-paper {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+            }
+            /* Forcer tous les textes et titres en noir */
+            h1, h2, h3, h4, p, span, div {
+                color: black !important;
+                background-color: transparent !important;
+            }
+            /* Remplacer les fonds colorés des badges par des bordures */
+            .report-tag, .badge-glass, .status-indicator {
+                border: 1px solid black !important;
+                background: white !important;
+            }
+            /* Forcer le fond blanc */
+            body { background: white !important; }
+            .app-container { box-shadow: none !important; border: none !important; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <span class="pulse-icon"></span>
+                <h1>Aksanti<span>Net</span></h1>
+            </div>
+            <div class="header-actions">
+                <div id="ai-status-indicator" class="ai-status">
+                    <span class="status-dot online"></span>
+                    <span id="ai-mode-text" class="status-text">IA Ready</span>
+                    <div class="ai-toggle-wrapper" title="Basculer entre Local (GPU) et Cloud">
+                        <input type="checkbox" id="ai-mode-toggle" class="ai-toggle-checkbox" checked>
+                        <label for="ai-mode-toggle" class="ai-toggle-label">
+                            <span class="ai-toggle-switch"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- On retire toute la section patient-info-display -->
+
+        <!-- Recherche patient (visible dans minimal) -->
+        <section id="patient-selector-minimal" style="padding: 1rem 2rem; display: flex; justify-content: center;">
+            <div class="autocomplete" style="position: relative; width: 100%; max-width: 400px;">
+                <input type="text" id="patient-search" class="glass-input" placeholder="Rechercher un patient..." autocomplete="off" style="width: 100%;">
+                <div id="autocomplete-results" class="autocomplete-results hidden" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 100;"></div>
+            </div>
+        </section>
+
+        <main>
+            <!-- Centre de Commande Vocal -->
+            <section class="voice-command-center">
+                <div class="status" id="connection-status">Prêt pour la dictée</div>
+                <div class="visualizer-container">
+                    <div class="visualizer" id="visualizer"></div>
+                    <button id="mic-btn" class="mic-button" aria-label="Démarrer la dictée">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 1L12 13M12 1L9 4M12 1L15 4" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M19 10V11C19 14.866 15.866 18 12 18V18C8.13401 18 5 14.866 5 11V10"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M12 18V23M8 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                    <button id="vision-btn" class="vision-button" title="Analyse Vision (Radiographies...)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                    </button>
+                    <button id="stop-btn" class="stop-button hidden" aria-label="Arrêter l'enregistrement">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="prompt-tip-container" style="margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px;">
+                    <!-- Bouton Exemple -->
+                    <button id="toggle-prompt-example" class="btn-tip" style="background: rgba(23, 91, 98, 0.1); border: 1px solid rgba(23, 91, 98, 0.2); padding: 8px 16px; border-radius: 20px; color: var(--primary); font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        <span>Exemple de prompt</span>
+                    </button>
+
+                    <!-- Bouton Guide -->
+                    <button id="toggle-prompt-guide" class="btn-tip" style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); padding: 8px 16px; border-radius: 20px; color: #7c3aed; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                        <span>Guide de rédaction</span>
+                    </button>
+                </div>
+
+                <!-- Panneau Latéral (Modale Gauche) -->
+                <div id="side-panel" class="glass" style="position: fixed; top: 0; left: -400px; width: 380px; height: 100vh; background: rgba(255, 255, 255, 0.98); z-index: 1000; box-shadow: 10px 0 30px rgba(0,0,0,0.1); transition: left 0.4s cubic-bezier(0.075, 0.82, 0.165, 1); padding: 30px; overflow-y: auto; backdrop-filter: blur(10px); border-right: 1px solid rgba(0,0,0,0.05);">
+                    <button id="close-panel" style="position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999;">&times;</button>
+                    
+                    <div id="panel-content-example" style="display: none;">
+                        <h3 style="color: var(--primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-lightbulb"></i> Exemple Optimal
+                        </h3>
+                        <div style="background: rgba(23, 91, 98, 0.05); padding: 20px; border-radius: 12px; border: 1px dashed var(--primary); margin-bottom: 20px;">
+                            <p id="prompt-text-content" style="font-style: italic; color: #444; line-height: 1.6;">
+                                "Enfant fille de 18 mois, originaire de Goma, déplacée depuis 3 semaines. Poids : 7,8 kg. Fièvre à 39,8°C depuis 5 jours, frissons nocturnes, refus de téter depuis ce matin. Diarrhées liquides abondantes (10 selles/j). Vaccination incomplète."
+                            </p>
+                        </div>
+                        <button id="copy-example-btn" class="btn primary" style="width: 100%;">Copier dans la dictée</button>
+                    </div>
+
+                    <div id="panel-content-guide" style="display: none;">
+                        <h3 style="color: #7c3aed; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-stethoscope"></i> Guide de rédaction
+                        </h3>
+                        <div style="display: flex; flex-direction: column; gap: 20px; color: #333; font-size: 0.9rem;">
+                            <div>
+                                <p style="font-weight: bold; color: #7c3aed; margin-bottom: 6px;">1. Identité & Contexte Vital</p>
+                                <p>Âge et sexe cruciaux pour doses (Artésunate, MgSO4). <br><em>Ex: "Enfant de 5 ans, sexe masculin..."</em></p>
+                            </div>
+                            <div>
+                                <p style="font-weight: bold; color: #7c3aed; margin-bottom: 6px;">2. Termes Locaux</p>
+                                <p>AksantiNet comprend : <em>"nzoto moto"</em>, <em>"corps chaud"</em>, <em>"prostré"</em>, <em>"ventre de bois"</em>.</p>
+                            </div>
+                            <div>
+                                <p style="font-weight: bold; color: #7c3aed; margin-bottom: 6px;">3. Durée (Indispensable Sentinel)</p>
+                                <p>Pour différencier Palu vs Typhoïde. <br><em>Ex: "Toux depuis 3 semaines"</em>.</p>
+                            </div>
+                            <div>
+                                <p style="font-weight: bold; color: #7c3aed; margin-bottom: 6px;">4. Signes de Danger (Red Flags)</p>
+                                <p>Convulsions, vomissements systématiques, saignements, antécédents (Ebola, Drépanocytose).</p>
+                            </div>
+                            <div style="background: rgba(139, 92, 246, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #7c3aed;">
+                                <p style="font-weight: bold; margin-bottom: 5px;">Modèle recommandé :</p>
+                                <p style="font-style: italic;">"[Âge/Sexe]. [Symptôme principal] depuis [Durée]. Présence de [Signe de danger]. Antécédent de [Maladie/Zone]."</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <textarea class="transcription-preview" id="transcription"
+                    spellcheck="true">Cliquez sur le micro pour commencer à dicter vos instructions...</textarea>
+                
+                <div class="transcription-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="refine-btn" class="btn secondary" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3); color: #7c3aed;">
+                        <i class="fas fa-magic"></i> Nettoyer (Cloud)
+                    </button>
+                    <button id="verify-btn" class="btn secondary verify-btn" disabled>
+                        <i class="fas fa-search"></i> Vérifier les données
+                    </button>
+                    <button id="analyze-btn" class="btn primary analyze-btn" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sparkle" style="width:18px; height:18px; margin-right:8px;">
+                            <path d="M12 3V4M12 20V21M4 12H3M21 12H20M18.364 18.364L17.657 17.657M6.343 6.343L5.636 5.636M18.364 5.636L17.657 6.343M6.343 18.364L5.636 17.657M12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8Z"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Analyser avec MedGemma
+                    </button>
+                </div>
+
+                <!-- Résultats de la recherche vectorielle (Qdrant) -->
+                <div id="semantic-interpretation-container" class="hidden" style="margin-top: 25px; padding: 15px; background: rgba(23, 91, 98, 0.03); border-radius: 12px; border-left: 4px solid var(--primary);">
+                    <h4 style="font-size: 0.9rem; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg>
+                        Interprétation Sémantique (Qdrant)
+                    </h4>
+                    <p id="semantic-summary-text" style="font-size: 0.85rem; color: #555; line-height: 1.5;">
+                        Analyse des vecteurs médicaux en cours...
+                    </p>
+                </div>
+
+                <div id="verification-results" class="verification-results hidden" style="margin-top: 15px; min-height: 50px;"></div>
+
+                <!-- Module Vision -->
+                <div id="vision-upload-container" class="vision-upload-container hidden">
+                    <div class="glass-upload-zone" id="vision-drop-zone">
+                        <input type="file" id="vision-file-input" class="hidden" accept=".jpg,.jpeg,.png,.dicom,.dcm,image/*">
+                        <div class="upload-content">
+                            <div class="upload-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <div class="upload-text">
+                                <h3>Charger une imagerie</h3>
+                                <p>DICOM, JPEG, PNG</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="vision-preview-container" class="vision-preview-container hidden">
+                        <div class="dicom-player glass">
+                            <div id="dicom-viewport" class="dicom-viewport" style="height: 300px;"></div>
+                            <div class="player-actions">
+                                <button id="remove-vision-img" class="btn-remove">Supprimer</button>
+                                <button id="process-vision-btn" class="btn primary">Analyser l'Image</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Résultats MedGemma -->
+            <!-- Résultats MedGemma (Rapport Médical) -->
+            <section class="form-container hidden" id="result-container" style="margin-top: 40px; margin-bottom: 50px;">
+                <div class="report-actions" style="margin-bottom: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="print-report-btn" class="btn secondary" onclick="window.print()">
+                        <i class="fas fa-print"></i> Imprimer
+                    </button>
+                    <button type="button" id="export-btn" class="btn primary">
+                        <i class="fas fa-copy"></i> Copier le Rapport
+                    </button>
+                </div>
+                
+                <div id="report-content">
+                    <!-- Le script app.js injectera ici le document .medical-report-paper complet -->
+                    <div class="glass" style="padding: 40px; text-align: center; color: #999;">
+                        <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; margin-bottom: 15px;"></i>
+                        <p>Génération du rapport médical en cours...</p>
+                    </div>
+                </div>
+
+                <div class="form-actions" style="margin-top: 20px; display: flex; justify-content: center;">
+                    <button type="button" id="cancel-analysis-btn" class="btn secondary">Réinitialiser l'Analyse</button>
+                </div>
+            </section>
+
+            <div id="analysis-loader" class="analysis-loader hidden">
+                <div class="loader-content">
+                    <div class="spinner-premium"></div>
+                    <p id="loader-status">Interrogation de MedGemma...</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 AksantiNet - MedGemma AI</p>
+        </footer>
+    </div>
+
+    <!-- Eléments cachés nécessaires au JS pour éviter les erreurs (Shadow DOM pour VoiceAssistant) -->
+    <div class="hidden" style="display:none" aria-hidden="true">
+        <!-- Patient -->
+        <div id="patient-info-display"></div>
+        <div id="patient-initials"></div>
+        <div id="display-patient-name"></div>
+        <div id="display-patient-id"></div>
+        <div id="display-patient-age"></div>
+        <div id="display-patient-gender"></div>
+        <input type="text" id="display-patient-blood">
+        <input type="number" id="display-patient-weight">
+        <input type="number" id="display-patient-height">
+        <input type="number" id="display-patient-resp">
+        <select id="display-patient-consc"></select>
+        <input type="number" id="display-patient-glucose">
+        <input type="number" id="display-patient-pain">
+        <button id="clear-patient-btn"></button>
+        <form id="medical-form"></form>
+        <div id="loader-progress"></div>
+        <div id="report-empty-state"></div>
+        <div id="form-empty-state"></div>
+        <div id="json-empty-state"></div>
+        <div id="api-response-container">
+            <span class="status-indicator"></span>
+        </div>
+        <button id="cancel-btn"></button>
+        
+        <!-- Onglets et Vues additionnelles -->
+        <button id="tab-json"></button>
+        <button id="tab-vision"></button>
+        <button id="tab-form"></button>
+        <button id="tab-report"></button>
+        <div id="view-json"></div>
+        <div id="view-vision"></div>
+        <div id="json-document-container"></div>
+        <div id="vision-results-content"></div>
+        <div id="vision-history-container"></div>
+        <div id="vision-empty-state"></div>
+        <div id="vision-progress-wrapper"></div>
+        <div id="vision-progress-status"></div>
+        <div id="vision-progress-fill"></div>
+        <button id="refresh-vision-history"></button>
+        <button id="close-series-browser"></button>
+        <button id="series-prev"></button>
+        <button id="series-next"></button>
+        <input type="file" id="vision-folder-input">
+
+        <!-- Modale d'aide originale -->
+        <div id="prompt-modal">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="modal-header"></div>
+                <div id="prompt-example-text"></div>
+                <button id="close-modal-btn"></button>
+                <button id="copy-prompt-btn"></button>
+                <button id="use-example-btn"></button>
+            </div>
+        </div>
+        <button id="show-prompt-tip"></button>
+
+        <!-- Validation -->
+        <div id="validation-modal">
+            <div class="modal-overlay"></div>
+            <ul id="missing-fields-list"></ul>
+            <button id="close-validation-btn"></button>
+            <button id="close-validation-modal-btn"></button>
+        </div>
+
+        <!-- Patient Edit Modal -->
+        <div id="patient-modal" class="modal hidden">
+            <div class="modal-overlay"></div>
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <h3 id="patient-modal-title">Fiche Patient</h3>
+                    <button class="close-modal" id="close-patient-modal-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="patient-modal-form">
+                        <div class="patient-modal-grid">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-lastname">Nom</label>
+                                    <input type="text" id="pm-lastname" class="glass-input" placeholder="Nom de famille">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pm-firstname">Prénom</label>
+                                    <input type="text" id="pm-firstname" class="glass-input" placeholder="Prénom">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-age">Âge</label>
+                                    <input type="number" id="pm-age" class="glass-input" placeholder="ans" min="0" max="120">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pm-gender">Genre</label>
+                                    <select id="pm-gender" class="glass-input">
+                                        <option value="0">Homme</option>
+                                        <option value="1">Femme</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-weight">Poids (kg)</label>
+                                    <input type="number" id="pm-weight" class="glass-input" placeholder="kg" step="0.1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pm-height">Taille (cm)</label>
+                                    <input type="number" id="pm-height" class="glass-input" placeholder="cm">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-blood">Gr. Sanguin</label>
+                                    <input type="text" id="pm-blood" class="glass-input" placeholder="A+">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pm-resp">Fréq. Resp (/min)</label>
+                                    <input type="number" id="pm-resp" class="glass-input" placeholder="/min">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-consc">Conscience</label>
+                                    <select id="pm-consc" class="glass-input">
+                                        <option value="A">A (Alerte)</option>
+                                        <option value="C">C (Confus)</option>
+                                        <option value="V">V (Voix)</option>
+                                        <option value="P">P (Douleur)</option>
+                                        <option value="U">U (Inconscient)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="pm-glucose">Glycémie (g/L)</label>
+                                    <input type="number" id="pm-glucose" class="glass-input" placeholder="g/L" step="0.1">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-pain">Douleur EVA (/10)</label>
+                                    <input type="number" id="pm-pain" class="glass-input" placeholder="0-10" min="0" max="10">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="patient-modal-cancel" class="btn secondary">Annuler</button>
+                    <button type="button" id="patient-modal-save" class="btn primary">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug -->
+        <pre id="api-response-content"></pre>
+        <div id="vector-json-container" class="api-response vector-debug hidden">
+            <button id="toggle-vector-json"></button>
+            <pre id="vector-json-content"></pre>
+        </div>
+       <script>
+        // Eléments DOM
+        const toggleBtn = document.getElementById('toggle-prompt-example');
+        const guideBtn = document.getElementById('toggle-prompt-guide');
+        const sidePanel = document.getElementById('side-panel');
+        const closePanel = document.getElementById('close-panel');
+        const contentExample = document.getElementById('panel-content-example');
+        const contentGuide = document.getElementById('panel-content-guide');
+        const copyBtn = document.getElementById('copy-example-btn');
+        const transcription = document.getElementById('transcription');
+
+        // Gestion du panneau
+        function openPanel(type) {
+            if (!sidePanel) return;
+            sidePanel.style.left = '0';
+            if (contentExample) contentExample.style.display = (type === 'example') ? 'block' : 'none';
+            if (contentGuide) contentGuide.style.display = (type === 'guide') ? 'block' : 'none';
+        }
+
+        function hidePanel() {
+            if (sidePanel) sidePanel.style.left = '-400px';
+        }
+
+        if (toggleBtn) toggleBtn.addEventListener('click', () => openPanel('example'));
+        if (guideBtn) guideBtn.addEventListener('click', () => openPanel('guide'));
+        if (closePanel) closePanel.addEventListener('click', hidePanel);
+        
+        if (copyBtn && transcription) {
+            copyBtn.addEventListener('click', () => {
+                const text = document.getElementById('prompt-text-content').textContent.trim();
+                transcription.value = text;
+                transcription.dispatchEvent(new Event('input', { bubbles: true }));
+                hidePanel();
+            });
+        }
+
+        // Déblocage SANS CONDITION des fonctions Micro/Vision
+        function forceActivateButtons() {
+            if (window.assistant) {
+                // NEUTRALISATION DES VALIDATIONS (Force le passage à true)
+                window.assistant.validatePatientData = () => true;
+                
+                // Injection d'un patient fantôme pour satisfaire les APIs de sauvegarde
+                window.assistant.selectedPatient = { id: "MIN", name: "Patient Minimal", age: 0, gender: 0 };
+
+                // Lien direct sans aucune condition
+                const micBtn = document.getElementById('mic-btn');
+                if (micBtn) {
+                    micBtn.onclick = (e) => {
+                        e.preventDefault();
+                        if (window.assistant.isRecording) {
+                            window.assistant.stopRecording();
+                        } else {
+                            // On appelle directement startRecording qui passera maintenant car validatePatientData = true
+                            window.assistant.startRecording();
+                        }
+                    };
+                }
+
+                const visionBtn = document.getElementById('vision-btn');
+                if (visionBtn) {
+                    visionBtn.onclick = (e) => {
+                        e.preventDefault();
+                        // Ouvre directement l'outil vision sans passer par les vérifications de modales
+                        window.assistant.toggleVisionTool();
+                    };
+                }
+
+                console.log("[Minimal] Mode SANS CONDITION activé.");
+                return true;
+            }
+            return false;
+        }
+
+        // Tentative d'activation immédiate
+        let attempts = 0;
+        const interval = setInterval(() => {
+            attempts++;
+            if (forceActivateButtons() || attempts > 20) clearInterval(interval);
+        }, 150);
+    </script>
+
+        <!-- Fermer si on clique en dehors du panneau (optionnel mais recommandé) -->
+        <script>
+        document.addEventListener('click', (e) => {
+            if (sidePanel && sidePanel.style.left === '0px' && !sidePanel.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target)) && (!guideBtn || !guideBtn.contains(e.target))) {
+                hidePanel();
+            }
+        });
+
+        if (copyBtn && transcription) {
+            copyBtn.addEventListener('click', () => {
+                const text = document.getElementById('prompt-text-content').textContent.trim();
+                transcription.value = text;
+                // Déclencher un événement input pour que le JS de l'app détecte le changement
+                transcription.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                // Petit feedback visuel
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = 'Copié !';
+                copyBtn.style.background = '#28a745';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = '';
+                }, 2000);
+            });
+        }
+
+        // Script pour peupler l'interprétation sémantique et injecter les scores
+        const resultsDiv = document.getElementById('verification-results');
+        const interpretationDiv = document.getElementById('semantic-interpretation-container');
+        const summaryText = document.getElementById('semantic-summary-text');
+
+        if (resultsDiv) {
+            const observer = new MutationObserver(() => {
+                const badges = resultsDiv.querySelectorAll('.semantic-badge');
+                if (badges.length > 0) {
+                    interpretationDiv.classList.remove('hidden');
+                    const types = {};
+                    
+                    badges.forEach(b => {
+                        const typeEl = b.querySelector('.type');
+                        const labelEl = b.querySelector('.label');
+                        if (!typeEl || !labelEl) return;
+
+                        const type = typeEl.textContent;
+                        const label = labelEl.textContent;
+                        
+                        // Injection du score de confiance
+                        if (!b.dataset.scoreAdded) {
+                            // On cherche le score dans l'attribut title
+                            const scoreMatch = b.title.match(/(\d+)%/);
+                            if (scoreMatch) {
+                                const score = scoreMatch[1];
+                                const scoreSpan = document.createElement('span');
+                                scoreSpan.className = 'score-badge';
+                                scoreSpan.textContent = `[${score}%] `;
+                                scoreSpan.style.cssText = 'font-size: 0.75rem; opacity: 0.8; margin-right: 6px; font-weight: bold; color: var(--primary);';
+                                labelEl.prepend(scoreSpan);
+                                b.dataset.scoreAdded = "true";
+                            }
+                        }
+
+                        if (!types[type]) types[type] = [];
+                        types[type].push(label);
+                    });
+
+                    // Mise à jour de la synthèse textuelle
+                    let summary = "Nous avons identifié ";
+                    const parts = [];
+                    for (const [type, labels] of Object.entries(types)) {
+                        parts.push(`${labels.length} <strong>${type.toLowerCase()}(s)</strong>`);
+                    }
+                    summaryText.innerHTML = summary + parts.join(', ') + ". Ces éléments sécurisent l'analyse MedGemma.";
+                } else {
+                    interpretationDiv.classList.add('hidden');
+                }
+            });
+
+            observer.observe(resultsDiv, { childList: true, subtree: true });
+        }
+
+        // Fonction de raffinage via Cloud
+        const refineBtn = document.getElementById('refine-btn');
+        if (refineBtn) {
+            refineBtn.addEventListener('click', async () => {
+                const text = transcription.value.trim();
+                if (!text || text.includes("Cliquez sur le micro")) return;
+
+                const originalHTML = refineBtn.innerHTML;
+                refineBtn.disabled = true;
+                refineBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Raffinage...';
+
+                try {
+                    // On utilise l'endpoint de raffinage/analyse mais avec une instruction spécifique
+                    const response = await fetch('/api/external/triage/refined-analyze', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-API-Key': '8300e795-30ad-4c9d-9a04-95d8986ac823'
+                        },
+                        body: JSON.stringify({ 
+                            context: text,
+                            instruction: "Corrige uniquement l'orthographe et la ponctuation médicale de ce texte, sans faire d'analyse diagnostique. Reste fidèle au sens original.",
+                            mode: 'cloud' // Force le cloud pour un nettoyage haute qualité
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data && data.refined_text) {
+                        transcription.value = data.refined_text;
+                        transcription.dispatchEvent(new Event('input', { bubbles: true }));
+                    } else if (data && data.analysis && data.analysis.summary) {
+                        // Fallback si le format est différent
+                        transcription.value = data.analysis.summary;
+                    }
+                } catch (error) {
+                    console.error("Erreur de raffinage Cloud:", error);
+                } finally {
+                    refineBtn.disabled = false;
+                    refineBtn.innerHTML = originalHTML;
+                }
+            });
+        }
+    </script>
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>
