@@ -55,6 +55,7 @@ class VoiceAssistant {
         this.displayPatientGlucose = document.getElementById('display-patient-glucose');
         this.displayPatientPain = document.getElementById('display-patient-pain');
         this.displayPatientTemp = document.getElementById('display-patient-temp');
+        this.displayPatientBp = document.getElementById('display-patient-bp');
         this.patientInitials = document.getElementById('patient-initials');
         this.clearPatientBtn = document.getElementById('clear-patient-btn');
         // Eléments de la modale d'aide
@@ -139,6 +140,7 @@ class VoiceAssistant {
         this.pmGlucose = document.getElementById('pm-glucose');
         this.pmPain = document.getElementById('pm-pain');
         this.pmTemp = document.getElementById('pm-temp');
+        this.pmBp = document.getElementById('pm-bp');
         this.patientModalSaveBtn = document.getElementById('patient-modal-save');
         this.patientModalCancelBtn = document.getElementById('patient-modal-cancel');
         this.closePatientModalBtn = document.getElementById('close-patient-modal-btn');
@@ -584,7 +586,7 @@ class VoiceAssistant {
             });
         }
         // --- Patient Data Validation ---
-        [this.displayPatientWeight, this.displayPatientHeight, this.displayPatientResp, this.displayPatientConsc, this.displayPatientPain, this.displayPatientTemp].forEach(el => {
+        [this.displayPatientWeight, this.displayPatientHeight, this.displayPatientResp, this.displayPatientConsc, this.displayPatientPain, this.displayPatientTemp, this.displayPatientBp].forEach(el => {
             if (el) {
                 el.addEventListener('input', () => this.validatePatientData());
                 el.addEventListener('change', () => this.validatePatientData());
@@ -856,6 +858,7 @@ class VoiceAssistant {
         this.pmGlucose.value = p.glucose !== undefined ? p.glucose : '';
         this.pmPain.value = p.pain_eva !== undefined ? p.pain_eva : '';
         if (this.pmTemp) this.pmTemp.value = p.temperature !== undefined ? p.temperature : '';
+        if (this.pmBp) this.pmBp.value = p.blood_pressure || '';
         this.patientModal.classList.remove('hidden');
     }
     closePatientModal() {
@@ -877,6 +880,7 @@ class VoiceAssistant {
         p.glucose = this.pmGlucose.value !== '' ? parseFloat(this.pmGlucose.value) : undefined;
         p.pain_eva = this.pmPain.value !== '' ? parseInt(this.pmPain.value) : undefined;
         if (this.pmTemp) p.temperature = this.pmTemp.value !== '' ? parseFloat(this.pmTemp.value) : undefined;
+        if (this.pmBp) p.blood_pressure = this.pmBp.value.trim();
         // Mettre à jour l'interface "Box"
         this.displayPatientName.textContent = p.name || 'Nom du Patient';
         this.displayPatientId.textContent = `#${p.id}`;
@@ -889,6 +893,7 @@ class VoiceAssistant {
         this.displayPatientGlucose.value = p.glucose !== undefined ? p.glucose : '';
         this.displayPatientPain.value = p.pain_eva !== undefined ? p.pain_eva : '';
         if (this.displayPatientTemp) this.displayPatientTemp.value = p.temperature !== undefined ? p.temperature : '';
+        if (this.displayPatientBp) this.displayPatientBp.value = p.blood_pressure || '';
         const genderText = p.gender === '0' || p.gender === 0 ? 'Homme' :
             (p.gender === '1' || p.gender === 1 ? 'Femme' : 'Non spécifié');
         this.displayPatientGender.textContent = genderText;
@@ -925,6 +930,7 @@ class VoiceAssistant {
         this.displayPatientGlucose.value = '';
         this.displayPatientPain.value = '';
         if (this.displayPatientTemp) this.displayPatientTemp.value = '';
+        if (this.displayPatientBp) this.displayPatientBp.value = '';
         this.patientSearch.focus();
         this.validatePatientData();
     }
@@ -1046,6 +1052,7 @@ class VoiceAssistant {
 - Poids : ${this.displayPatientWeight?.value ? this.displayPatientWeight.value + ' kg' : 'Non spécifié'}
 - Taille : ${this.displayPatientHeight?.value ? this.displayPatientHeight.value + ' cm' : 'Non spécifié'}
 - Température : ${this.displayPatientTemp?.value ? this.displayPatientTemp.value + ' °C' : 'Non spécifié'}
+- Tension Artérielle : ${this.displayPatientBp?.value ? this.displayPatientBp.value + ' mmHg' : 'Non spécifié'}
 - Fréquence Resp. : ${this.displayPatientResp?.value ? this.displayPatientResp.value + ' /min' : 'Non spécifié'}
 - Conscience : ${this.displayPatientConsc?.value || 'A'}
 - Glycémie : ${this.displayPatientGlucose?.value ? this.displayPatientGlucose.value + ' g/L' : 'Non spécifié'}
@@ -1080,7 +1087,8 @@ class VoiceAssistant {
                     consciousness: this.displayPatientConsc?.value,
                     glucose: this.displayPatientGlucose?.value,
                     pain_eva: this.displayPatientPain?.value,
-                    temperature: this.displayPatientTemp ? this.displayPatientTemp.value : undefined
+                    temperature: this.displayPatientTemp ? this.displayPatientTemp.value : undefined,
+                    blood_pressure: this.displayPatientBp ? this.displayPatientBp.value : undefined
                 } : null
             };
             // Transition vers l'analyse médicale après un court délai simulé pour la fluidité
@@ -1478,11 +1486,12 @@ class VoiceAssistant {
             formData.append('patient_weight', this.displayPatientWeight?.value || '');
             formData.append('patient_height', this.displayPatientHeight?.value || '');
             formData.append('patient_temp', this.displayPatientTemp?.value || '');
+            formData.append('patient_bp', this.displayPatientBp?.value || '');
             formData.append('patient_resp', this.displayPatientResp?.value || '');
             formData.append('patient_consc', this.displayPatientConsc?.value || 'A');
             formData.append('patient_pain', this.displayPatientPain?.value || '');
             formData.append('patient_glucose', this.displayPatientGlucose?.value || '');
-            formData.append('context_prompt', `Prends impérativement en compte les constantes vitales du patient (Poids: ${this.displayPatientWeight?.value || '?'}kg, Température: ${this.displayPatientTemp?.value || '?'}°C, Douleur EVA: ${this.displayPatientPain?.value || '?'}/10) pour affiner le diagnostic différentiel.`);
+            formData.append('context_prompt', `Prends impérativement en compte les constantes vitales du patient (Poids: ${this.displayPatientWeight?.value || '?'}kg, Température: ${this.displayPatientTemp?.value || '?'}°C, Tension Artérielle: ${this.displayPatientBp?.value || '?'} mmHg, Douleur EVA: ${this.displayPatientPain?.value || '?'}/10) pour affiner le diagnostic différentiel.`);
         }
         try {
             const response = await api.post('/api/external/triage/voice', formData, {

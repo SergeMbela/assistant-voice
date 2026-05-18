@@ -382,6 +382,7 @@
         <input type="number" id="display-patient-glucose">
         <input type="number" id="display-patient-pain">
         <input type="number" id="display-patient-temp">
+        <input type="text" id="display-patient-bp">
         <button id="clear-patient-btn"></button>
         <form id="medical-form"></form>
         <div id="loader-progress"></div>
@@ -512,6 +513,12 @@
                                 <div class="form-group">
                                     <label for="pm-temp">Température (°C)</label>
                                     <input type="number" id="pm-temp" class="glass-input" placeholder="37.0" step="0.1">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="pm-bp">Tension Artérielle (mmHg)</label>
+                                    <input type="text" id="pm-bp" class="glass-input" placeholder="120/80">
                                 </div>
                             </div>
                         </div>
