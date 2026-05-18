@@ -597,6 +597,30 @@ class VoiceAssistant {
         if (valOverlay) {
             valOverlay.onclick = () => this.validationModal.classList.add('hidden');
         }
+
+        // Patient Edit Modal Events
+        if (this.patientModalSaveBtn) {
+            this.patientModalSaveBtn.addEventListener('click', () => this.savePatientModal());
+        }
+        if (this.patientModalCancelBtn) {
+            this.patientModalCancelBtn.addEventListener('click', () => this.closePatientModal());
+        }
+        if (this.closePatientModalBtn) {
+            this.closePatientModalBtn.addEventListener('click', () => this.closePatientModal());
+        }
+        const patientOverlay = this.patientModal?.querySelector('.modal-overlay');
+        if (patientOverlay) {
+            patientOverlay.addEventListener('click', () => this.closePatientModal());
+        }
+        if (this.patientInfoDisplay) {
+            this.patientInfoDisplay.addEventListener('click', (e) => {
+                if (e.target !== this.clearPatientBtn && !this.clearPatientBtn.contains(e.target)) {
+                    this.openPatientModal();
+                }
+            });
+            this.patientInfoDisplay.style.cursor = 'pointer';
+            this.patientInfoDisplay.title = 'Cliquez pour modifier la fiche patient';
+        }
     }
     validatePatientData() {
         const missing = [];
@@ -720,15 +744,45 @@ class VoiceAssistant {
     }
     renderAutocompleteResults(results) {
         this.autocompleteResults.innerHTML = '';
+        const query = this.patientSearch ? this.patientSearch.value.trim() : '';
+
         if (results.length === 0) {
-            this.autocompleteResults.classList.add('hidden');
+            if (query.length > 0) {
+                const createDiv = document.createElement('div');
+                createDiv.className = 'autocomplete-item create-patient-item';
+                createDiv.innerHTML = `
+                    <div style="color: var(--primary); font-weight: 600;">➕ Créer le patient "${query}"</div>
+                    <span class="patient-info">Nouvelle fiche patient</span>
+                `;
+                createDiv.addEventListener('click', () => {
+                    const parts = query.split(' ');
+                    const firstname = parts[0] || '';
+                    const lastname = parts.slice(1).join(' ') || '';
+                    const newPatient = {
+                        id: 'PAT-' + Math.floor(1000 + Math.random() * 9000),
+                        firstname: firstname,
+                        lastname: lastname,
+                        full_name: query,
+                        age: 30,
+                        gender: 0,
+                        weight: 70,
+                        height: 170
+                    };
+                    this.selectPatient(newPatient);
+                });
+                this.autocompleteResults.appendChild(createDiv);
+                this.autocompleteResults.classList.remove('hidden');
+            } else {
+                this.autocompleteResults.classList.add('hidden');
+            }
             return;
         }
+
         results.forEach(patient => {
             const div = document.createElement('div');
             div.className = 'autocomplete-item';
-            const name = patient.full_name || `${patient.firstname} ${patient.lastname}`;
-            const info = `Âge: ${patient.age || '?'} | ID: ${patient.id}`;
+            const name = patient.full_name || `${patient.firstname || ''} ${patient.lastname || ''}`.trim();
+            const info = `Âge: ${patient.age !== undefined ? patient.age : '?'} | ID: ${patient.id}`;
             div.innerHTML = `
                 <div>${name}</div>
                 <span class="patient-info">${info}</span>
@@ -738,6 +792,36 @@ class VoiceAssistant {
             });
             this.autocompleteResults.appendChild(div);
         });
+
+        // Ajouter aussi l'option de création à la fin si la recherche ne correspond pas exactement
+        if (query.length > 0 && !results.some(p => (p.full_name || `${p.firstname || ''} ${p.lastname || ''}`).toLowerCase() === query.toLowerCase())) {
+            const createDiv = document.createElement('div');
+            createDiv.className = 'autocomplete-item create-patient-item';
+            createDiv.style.borderTop = '1px solid var(--border-color)';
+            createDiv.style.background = 'var(--bg-surface)';
+            createDiv.innerHTML = `
+                <div style="color: var(--primary); font-weight: 600;">➕ Créer le patient "${query}"</div>
+                <span class="patient-info">Nouvelle fiche patient</span>
+            `;
+            createDiv.addEventListener('click', () => {
+                const parts = query.split(' ');
+                const firstname = parts[0] || '';
+                const lastname = parts.slice(1).join(' ') || '';
+                const newPatient = {
+                    id: 'PAT-' + Math.floor(1000 + Math.random() * 9000),
+                    firstname: firstname,
+                    lastname: lastname,
+                    full_name: query,
+                    age: 30,
+                    gender: 0,
+                    weight: 70,
+                    height: 170
+                };
+                this.selectPatient(newPatient);
+            });
+            this.autocompleteResults.appendChild(createDiv);
+        }
+
         this.autocompleteResults.classList.remove('hidden');
     }
     selectPatient(patient) {
