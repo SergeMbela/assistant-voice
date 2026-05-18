@@ -144,6 +144,14 @@
                             </div>
                         </div>
                     </div>
+                    <div class="patient-social-row" id="display-patient-social-row" style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                        <input type="checkbox" id="display-patient-rural" class="hidden">
+                        <input type="checkbox" id="display-patient-poverty" class="hidden">
+                        <input type="checkbox" id="display-patient-malnutrition" class="hidden">
+                        <span id="badge-rural" class="social-badge hidden" style="background: rgba(235, 152, 78, 0.2); color: #eb984e; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; border: 1px solid #eb984e;">Milieu rural</span>
+                        <span id="badge-poverty" class="social-badge hidden" style="background: rgba(231, 76, 60, 0.2); color: #e74c3c; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; border: 1px solid #e74c3c;">Pauvreté</span>
+                        <span id="badge-malnutrition" class="social-badge hidden" style="background: rgba(155, 89, 182, 0.2); color: #9b59b6; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; border: 1px solid #9b59b6;">Malnutrition</span>
+                    </div>
                 </div>
                 <button id="clear-patient-btn" class="clear-btn" aria-label="Changer de patient">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -646,6 +654,25 @@ Aucun médicament en cours.</p>
                             <div class="form-group">
                                 <label for="pm-bp">Tension Artérielle (mmHg)</label>
                                 <input type="text" id="pm-bp" class="glass-input" placeholder="120/80">
+                            </div>
+                        </div>
+                        <div class="form-row" style="grid-column: span 2; margin-top: 0.5rem;">
+                            <div class="form-group" style="width: 100%;">
+                                <label>Facteurs de risque socio-environnementaux</label>
+                                <div class="checkbox-group" style="display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" id="pm-rural" class="glass-checkbox">
+                                        <span>Milieu rural</span>
+                                    </label>
+                                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" id="pm-poverty" class="glass-checkbox">
+                                        <span>Pauvreté</span>
+                                    </label>
+                                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" id="pm-malnutrition" class="glass-checkbox">
+                                        <span>Malnutrition</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>

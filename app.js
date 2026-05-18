@@ -56,6 +56,12 @@ class VoiceAssistant {
         this.displayPatientPain = document.getElementById('display-patient-pain');
         this.displayPatientTemp = document.getElementById('display-patient-temp');
         this.displayPatientBp = document.getElementById('display-patient-bp');
+        this.displayPatientRural = document.getElementById('display-patient-rural');
+        this.displayPatientPoverty = document.getElementById('display-patient-poverty');
+        this.displayPatientMalnutrition = document.getElementById('display-patient-malnutrition');
+        this.badgeRural = document.getElementById('badge-rural');
+        this.badgePoverty = document.getElementById('badge-poverty');
+        this.badgeMalnutrition = document.getElementById('badge-malnutrition');
         this.patientInitials = document.getElementById('patient-initials');
         this.clearPatientBtn = document.getElementById('clear-patient-btn');
         // Eléments de la modale d'aide
@@ -141,6 +147,9 @@ class VoiceAssistant {
         this.pmPain = document.getElementById('pm-pain');
         this.pmTemp = document.getElementById('pm-temp');
         this.pmBp = document.getElementById('pm-bp');
+        this.pmRural = document.getElementById('pm-rural');
+        this.pmPoverty = document.getElementById('pm-poverty');
+        this.pmMalnutrition = document.getElementById('pm-malnutrition');
         this.patientModalSaveBtn = document.getElementById('patient-modal-save');
         this.patientModalCancelBtn = document.getElementById('patient-modal-cancel');
         this.closePatientModalBtn = document.getElementById('close-patient-modal-btn');
@@ -859,6 +868,9 @@ class VoiceAssistant {
         this.pmPain.value = p.pain_eva !== undefined ? p.pain_eva : '';
         if (this.pmTemp) this.pmTemp.value = p.temperature !== undefined ? p.temperature : '';
         if (this.pmBp) this.pmBp.value = p.blood_pressure || '';
+        if (this.pmRural) this.pmRural.checked = p.rural || false;
+        if (this.pmPoverty) this.pmPoverty.checked = p.poverty || false;
+        if (this.pmMalnutrition) this.pmMalnutrition.checked = p.malnutrition || false;
         this.patientModal.classList.remove('hidden');
     }
     closePatientModal() {
@@ -881,6 +893,9 @@ class VoiceAssistant {
         p.pain_eva = this.pmPain.value !== '' ? parseInt(this.pmPain.value) : undefined;
         if (this.pmTemp) p.temperature = this.pmTemp.value !== '' ? parseFloat(this.pmTemp.value) : undefined;
         if (this.pmBp) p.blood_pressure = this.pmBp.value.trim();
+        if (this.pmRural) p.rural = this.pmRural.checked;
+        if (this.pmPoverty) p.poverty = this.pmPoverty.checked;
+        if (this.pmMalnutrition) p.malnutrition = this.pmMalnutrition.checked;
         // Mettre à jour l'interface "Box"
         this.displayPatientName.textContent = p.name || 'Nom du Patient';
         this.displayPatientId.textContent = `#${p.id}`;
@@ -894,6 +909,12 @@ class VoiceAssistant {
         this.displayPatientPain.value = p.pain_eva !== undefined ? p.pain_eva : '';
         if (this.displayPatientTemp) this.displayPatientTemp.value = p.temperature !== undefined ? p.temperature : '';
         if (this.displayPatientBp) this.displayPatientBp.value = p.blood_pressure || '';
+        if (this.displayPatientRural) this.displayPatientRural.checked = p.rural || false;
+        if (this.displayPatientPoverty) this.displayPatientPoverty.checked = p.poverty || false;
+        if (this.displayPatientMalnutrition) this.displayPatientMalnutrition.checked = p.malnutrition || false;
+        if (this.badgeRural) this.badgeRural.classList.toggle('hidden', !p.rural);
+        if (this.badgePoverty) this.badgePoverty.classList.toggle('hidden', !p.poverty);
+        if (this.badgeMalnutrition) this.badgeMalnutrition.classList.toggle('hidden', !p.malnutrition);
         const genderText = p.gender === '0' || p.gender === 0 ? 'Homme' :
             (p.gender === '1' || p.gender === 1 ? 'Femme' : 'Non spécifié');
         this.displayPatientGender.textContent = genderText;
@@ -931,6 +952,12 @@ class VoiceAssistant {
         this.displayPatientPain.value = '';
         if (this.displayPatientTemp) this.displayPatientTemp.value = '';
         if (this.displayPatientBp) this.displayPatientBp.value = '';
+        if (this.displayPatientRural) this.displayPatientRural.checked = false;
+        if (this.displayPatientPoverty) this.displayPatientPoverty.checked = false;
+        if (this.displayPatientMalnutrition) this.displayPatientMalnutrition.checked = false;
+        if (this.badgeRural) this.badgeRural.classList.add('hidden');
+        if (this.badgePoverty) this.badgePoverty.classList.add('hidden');
+        if (this.badgeMalnutrition) this.badgeMalnutrition.classList.add('hidden');
         this.patientSearch.focus();
         this.validatePatientData();
     }
@@ -1057,13 +1084,18 @@ class VoiceAssistant {
 - Conscience : ${this.displayPatientConsc?.value || 'A'}
 - Glycémie : ${this.displayPatientGlucose?.value ? this.displayPatientGlucose.value + ' g/L' : 'Non spécifié'}
 - Douleur (EVA) : ${this.displayPatientPain?.value ? this.displayPatientPain.value + ' /10' : 'Non spécifié'}
+- Contexte socio-environnemental : ${[
+    this.displayPatientRural?.checked ? 'Milieu rural' : null,
+    this.displayPatientPoverty?.checked ? 'Pauvreté' : null,
+    this.displayPatientMalnutrition?.checked ? 'Malnutrition' : null
+].filter(Boolean).join(', ') || 'Aucun facteur de risque signalé'}
 - Antécédents : ${this.selectedPatient.history || 'Aucun spécifié'}
 ` : '';
 
             const payload = {
                 context: `${text}\n\n${patientClinicalData}\n[INSTRUCTION MÉDICALE : 
-1. Prends impérativement en compte les DONNÉES CLINIQUES DU PATIENT ci-dessus (âge, température, constantes vitales, douleur) pour affiner ton analyse, écarter ou prioriser certaines hypothèses.
-2. Identifie les PIÈGES À ÉVITER (pitfalls) en lien direct avec ces constantes (ex: risque de sepsis si fièvre + tachypnée).
+1. Prends impérativement en compte les DONNÉES CLINIQUES ET SOCIO-ENVIRONNEMENTALES DU PATIENT ci-dessus (constantes vitales, milieu rural, pauvreté, malnutrition) pour affiner ton analyse, écarter ou prioriser certaines hypothèses (ex: pathologies tropicales ou carentielles accrues en milieu rural/précaire).
+2. Identifie les PIÈGES À ÉVITER (pitfalls) en lien direct avec ces constantes et ce contexte.
 3. Propose un DIAGNOSTIC DIFFÉRENTIEL (differential_diagnosis) hiérarchisé et affiné selon le profil et les constantes du patient.
 4. Extrais les CODES CIM-10 pour chaque diagnostic suspecté.
 5. Extrais les CODES LOINC pour les examens de laboratoire suggérés.
@@ -1088,7 +1120,10 @@ class VoiceAssistant {
                     glucose: this.displayPatientGlucose?.value,
                     pain_eva: this.displayPatientPain?.value,
                     temperature: this.displayPatientTemp ? this.displayPatientTemp.value : undefined,
-                    blood_pressure: this.displayPatientBp ? this.displayPatientBp.value : undefined
+                    blood_pressure: this.displayPatientBp ? this.displayPatientBp.value : undefined,
+                    rural: this.displayPatientRural ? this.displayPatientRural.checked : undefined,
+                    poverty: this.displayPatientPoverty ? this.displayPatientPoverty.checked : undefined,
+                    malnutrition: this.displayPatientMalnutrition ? this.displayPatientMalnutrition.checked : undefined
                 } : null
             };
             // Transition vers l'analyse médicale après un court délai simulé pour la fluidité
@@ -1491,7 +1526,10 @@ class VoiceAssistant {
             formData.append('patient_consc', this.displayPatientConsc?.value || 'A');
             formData.append('patient_pain', this.displayPatientPain?.value || '');
             formData.append('patient_glucose', this.displayPatientGlucose?.value || '');
-            formData.append('context_prompt', `Prends impérativement en compte les constantes vitales du patient (Poids: ${this.displayPatientWeight?.value || '?'}kg, Température: ${this.displayPatientTemp?.value || '?'}°C, Tension Artérielle: ${this.displayPatientBp?.value || '?'} mmHg, Douleur EVA: ${this.displayPatientPain?.value || '?'}/10) pour affiner le diagnostic différentiel.`);
+            formData.append('patient_rural', this.displayPatientRural?.checked ? 'true' : 'false');
+            formData.append('patient_poverty', this.displayPatientPoverty?.checked ? 'true' : 'false');
+            formData.append('patient_malnutrition', this.displayPatientMalnutrition?.checked ? 'true' : 'false');
+            formData.append('context_prompt', `Prends impérativement en compte les constantes vitales et le contexte socio-environnemental du patient (Poids: ${this.displayPatientWeight?.value || '?'}kg, Température: ${this.displayPatientTemp?.value || '?'}°C, Tension Artérielle: ${this.displayPatientBp?.value || '?'} mmHg, Milieu rural: ${this.displayPatientRural?.checked ? 'Oui':'Non'}, Pauvreté: ${this.displayPatientPoverty?.checked ? 'Oui':'Non'}, Malnutrition: ${this.displayPatientMalnutrition?.checked ? 'Oui':'Non'}) pour affiner le diagnostic différentiel.`);
         }
         try {
             const response = await api.post('/api/external/triage/voice', formData, {

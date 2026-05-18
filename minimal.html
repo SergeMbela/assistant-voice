@@ -383,6 +383,9 @@
         <input type="number" id="display-patient-pain">
         <input type="number" id="display-patient-temp">
         <input type="text" id="display-patient-bp">
+        <input type="checkbox" id="display-patient-rural">
+        <input type="checkbox" id="display-patient-poverty">
+        <input type="checkbox" id="display-patient-malnutrition">
         <button id="clear-patient-btn"></button>
         <form id="medical-form"></form>
         <div id="loader-progress"></div>
@@ -519,6 +522,25 @@
                                 <div class="form-group">
                                     <label for="pm-bp">Tension Artérielle (mmHg)</label>
                                     <input type="text" id="pm-bp" class="glass-input" placeholder="120/80">
+                                </div>
+                            </div>
+                            <div class="form-row" style="grid-column: span 2; margin-top: 0.5rem;">
+                                <div class="form-group" style="width: 100%;">
+                                    <label>Facteurs de risque socio-environnementaux</label>
+                                    <div class="checkbox-group" style="display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                                        <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                            <input type="checkbox" id="pm-rural" class="glass-checkbox">
+                                            <span>Milieu rural</span>
+                                        </label>
+                                        <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                            <input type="checkbox" id="pm-poverty" class="glass-checkbox">
+                                            <span>Pauvreté</span>
+                                        </label>
+                                        <label class="checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                            <input type="checkbox" id="pm-malnutrition" class="glass-checkbox">
+                                            <span>Malnutrition</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
