@@ -364,7 +364,7 @@ class VoiceAssistant {
                 params: { q: text, limit: 12 }
             });
             const results = response.data;
-            this.currentMatches = results.matches || results.suggestions || results.points || (Array.isArray(results) ? results : []);
+            this.currentMatches = results.results || results.matches || results.suggestions || results.points || (Array.isArray(results) ? results : []);
             this.verificationResultsDiv.innerHTML = '';
             // Affichage du JSON brut vectoriel
             if (this.vectorJsonContent) {
@@ -377,8 +377,8 @@ class VoiceAssistant {
                     const type = item.type || item.payload?.type || "Terme";
                     const label = item.display || item.label || item.payload?.label || item.name || "Inconnu";
                     const score = item.score !== undefined ? item.score : null;
-                    const meta = item.meta || item.payload || {};
-                    const code = meta.code || meta.id || null;
+                    const meta = item.meta || item.payload || item || {};
+                    const code = item.code || meta.code || meta.id || null;
                     // Nettoyage du nom de classe pour le type
                     const typeClass = type.toLowerCase().replace(/[^a-z0-9]/g, '-');
                     item.selected = true;
@@ -1580,8 +1580,73 @@ class VoiceAssistant {
      */
     renderAnalysis(rawData) {
         if (!rawData) return;
-        // ── Priorité au schéma JSON structuré (DynamicFormManager) ──
-        const schema = rawData.form_schema || (rawData.analysis && rawData.analysis.form_schema);
+        // ── Priorite au schema JSON structure (DynamicFormManager) ──
+        let schema = rawData.form_schema || (rawData.analysis && rawData.analysis.form_schema);
+        
+        // Si schema est un objet brut (ex: { cim10: {...}, loinc: {...}, exams: {...} }) au lieu d un tableau de sections, on le normalise
+        if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
+            const normalizedFields = [];
+            if (schema.cim10) {
+                const values = Array.isArray(schema.cim10.values) ? schema.cim10.values : [];
+                values.forEach((val, idx) => {
+                    normalizedFields.push({
+                        id: `cim10_${idx}_${Date.now()}`,
+                        label: idx === 0 ? 'Pistes Diagnostiques (CIM-10)' : '',
+                        type: 'autocomplete',
+                        source: '/api/cim10/search',
+                        value: val,
+                        repeatable: idx === values.length - 1,
+                        placeholder: 'Ex: A09.9'
+                    });
+                });
+                if (values.length === 0) {
+                    normalizedFields.push({
+                        id: 'cim10_primary', label: 'Pistes Diagnostiques (CIM-10)', type: 'autocomplete', source: '/api/cim10/search', repeatable: true, placeholder: 'Ex: A09.9'
+                    });
+                }
+            }
+            if (schema.loinc) {
+                const values = Array.isArray(schema.loinc.values) ? schema.loinc.values : [];
+                values.forEach((val, idx) => {
+                    normalizedFields.push({
+                        id: `loinc_${idx}_${Date.now()}`,
+                        label: idx === 0 ? 'Examens de Laboratoire (LOINC)' : '',
+                        type: 'autocomplete',
+                        source: '/api/medical/loinc/search',
+                        value: val,
+                        repeatable: idx === values.length - 1,
+                        placeholder: 'Ex: 2339-0'
+                    });
+                });
+                if (values.length === 0) {
+                    normalizedFields.push({
+                        id: 'loinc_primary', label: 'Examens de Laboratoire (LOINC)', type: 'autocomplete', source: '/api/medical/loinc/search', repeatable: true, placeholder: 'Ex: 2339-0'
+                    });
+                }
+            }
+            if (schema.exams) {
+                const values = Array.isArray(schema.exams.values) ? schema.exams.values : [];
+                values.forEach((val, idx) => {
+                    normalizedFields.push({
+                        id: `exam_${idx}_${Date.now()}`,
+                        label: idx === 0 ? 'Examens demandés' : '',
+                        type: 'text',
+                        value: val,
+                        repeatable: idx === values.length - 1,
+                        placeholder: 'Ex: NFS, CRP...'
+                    });
+                });
+            }
+            
+            schema = [
+                {
+                    id: 'coding_and_exams',
+                    label: 'Codage Médical & Examens',
+                    fields: normalizedFields
+                }
+            ];
+        }
+
         if (Array.isArray(schema) && schema.length > 0) {
             this.renderSchemaForm(schema);
             this.resultContainer.classList.remove('hidden');
@@ -2391,27 +2456,35 @@ Aucun médicament en cours.`;
         const medications = analysis.ia_suggestions_medicaments || analysis.prescriptions_draft || analysis.medications || analysis.prescriptions || analysis.medicaments || [];
         const symptoms = analysis.symptoms || analysis.symptomes || analysis.symptoms_detected || [];
         const differential = analysis.differential_diagnosis || analysis.diagnostic_differentiel || analysis.diagnostics_differentiels || [];
-        const cim10 = analysis.coding?.cim10 || analysis.diagnostics_cim10 || [];
-        const loinc = analysis.coding?.loinc || analysis.examens_loinc || [];
-        // Collecte exhaustive des conseils et pièges
+        let cim10 = analysis.coding?.cim10 || analysis.diagnostics_cim10 || [];
+        let loinc = analysis.coding?.loinc || analysis.examens_loinc || [];
+        // Collecte exhaustive des conseils et pieges
         let pitfalls = [...(analysis.pitfalls || analysis.pieges_a_eviter || analysis.pieges || analysis.conseils || [])];
-        // Extraire les pitfalls des doses d'urgence
+        // Extraire les pitfalls des doses d urgence
         if (analysis.doses_urgence_estimees_age?.doses) {
             Object.values(analysis.doses_urgence_estimees_age.doses).forEach(d => {
                 if (d.pitfall) pitfalls.push(`${d.indication || 'Traitement'}: ${d.pitfall}`);
             });
         }
-        // Scores cliniques (priorité aux scores calculés en racine)
+        // Scores cliniques (priorite aux scores calcules en racine)
         const rootScores = rootData.scores || {};
         const news2 = analysis.news2_score !== undefined ? analysis.news2_score : (rootScores.news2?.score ?? (rootScores.qsofa?.score ?? '--'));
         const triageScore = analysis.triage_score !== undefined ? analysis.triage_score : (rootScores.tropical?.score ?? '--');
         const severityScore = analysis.severity_index !== undefined ? analysis.severity_index : (rootScores.internal_medicine?.score ?? rootScores.cha2ds2_vasc?.score ?? '--');
-        // Regrouper tous les types d'examens
-        const exams = [
+        // Regrouper tous les types d examens
+        let exams = [
             ...(analysis.examens || analysis.exams || analysis.complementary_exams || []),
             ...(analysis.imaging_suggested || []),
             ...(analysis.lab_tests_suggested || [])
         ];
+        // Recuperation de secours depuis form_schema s il s agit d un objet brut
+        if (analysis.form_schema && typeof analysis.form_schema === 'object' && !Array.isArray(analysis.form_schema)) {
+            if (analysis.form_schema.cim10?.values) cim10 = analysis.form_schema.cim10.values;
+            if (analysis.form_schema.loinc?.values) loinc = analysis.form_schema.loinc.values;
+            if (analysis.form_schema.exams?.values) {
+                exams = [...exams, ...analysis.form_schema.exams.values];
+            }
+        }
         const alerts = analysis.ia_alertes || analysis.alerts || analysis.warnings || analysis.ia_alertes_securite || [];
         // Ajouter les actions d'alertes aux conseils
         alerts.forEach(a => {
