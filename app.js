@@ -2860,8 +2860,8 @@ Aucun médicament en cours.`;
             const diffHtml = typeof diffDiag === 'string' ? `<p class="rd-text">${diffDiag}</p>` : 
                 `<div class="rd-array-view">
                     ${diffDiag.map(d => {
-                        const label = typeof d === 'object' ? (d.label || d.name || d.diagnosis || '') : d;
-                        const context = typeof d === 'object' ? (d.context || d.justification || d.reason || '') : '';
+                        const label = typeof d === 'object' ? (d.label || d.name || d.diagnosis || d.diagnostic || d.piste || '') : d;
+                        const context = typeof d === 'object' ? (d.context || d.justification || d.reason || d.description || '') : '';
                         return `
                         <div class="rd-array-item" style="border-left-color:var(--secondary); background:rgba(255,255,255,0.01); margin-bottom:0.6rem; padding: 0.6rem 0.8rem">
                             <div style="font-weight:700; color:white; font-size:0.95rem; margin-bottom:0.2rem">${label}</div>
