@@ -54,6 +54,7 @@ class VoiceAssistant {
         this.displayPatientConsc = document.getElementById('display-patient-consc');
         this.displayPatientGlucose = document.getElementById('display-patient-glucose');
         this.displayPatientPain = document.getElementById('display-patient-pain');
+        this.displayPatientTemp = document.getElementById('display-patient-temp');
         this.patientInitials = document.getElementById('patient-initials');
         this.clearPatientBtn = document.getElementById('clear-patient-btn');
         // Eléments de la modale d'aide
@@ -137,6 +138,7 @@ class VoiceAssistant {
         this.pmConsc = document.getElementById('pm-consc');
         this.pmGlucose = document.getElementById('pm-glucose');
         this.pmPain = document.getElementById('pm-pain');
+        this.pmTemp = document.getElementById('pm-temp');
         this.patientModalSaveBtn = document.getElementById('patient-modal-save');
         this.patientModalCancelBtn = document.getElementById('patient-modal-cancel');
         this.closePatientModalBtn = document.getElementById('close-patient-modal-btn');
@@ -582,9 +584,11 @@ class VoiceAssistant {
             });
         }
         // --- Patient Data Validation ---
-        [this.displayPatientWeight, this.displayPatientHeight, this.displayPatientResp, this.displayPatientConsc, this.displayPatientPain].forEach(el => {
-            el.addEventListener('input', () => this.validatePatientData());
-            el.addEventListener('change', () => this.validatePatientData());
+        [this.displayPatientWeight, this.displayPatientHeight, this.displayPatientResp, this.displayPatientConsc, this.displayPatientPain, this.displayPatientTemp].forEach(el => {
+            if (el) {
+                el.addEventListener('input', () => this.validatePatientData());
+                el.addEventListener('change', () => this.validatePatientData());
+            }
         });
         // Validation Modal Events
         if (this.closeValidationBtn) {
@@ -851,6 +855,7 @@ class VoiceAssistant {
         this.pmConsc.value = p.consciousness || 'A';
         this.pmGlucose.value = p.glucose !== undefined ? p.glucose : '';
         this.pmPain.value = p.pain_eva !== undefined ? p.pain_eva : '';
+        if (this.pmTemp) this.pmTemp.value = p.temperature !== undefined ? p.temperature : '';
         this.patientModal.classList.remove('hidden');
     }
     closePatientModal() {
@@ -871,6 +876,7 @@ class VoiceAssistant {
         p.consciousness = this.pmConsc.value;
         p.glucose = this.pmGlucose.value !== '' ? parseFloat(this.pmGlucose.value) : undefined;
         p.pain_eva = this.pmPain.value !== '' ? parseInt(this.pmPain.value) : undefined;
+        if (this.pmTemp) p.temperature = this.pmTemp.value !== '' ? parseFloat(this.pmTemp.value) : undefined;
         // Mettre à jour l'interface "Box"
         this.displayPatientName.textContent = p.name || 'Nom du Patient';
         this.displayPatientId.textContent = `#${p.id}`;
@@ -882,6 +888,7 @@ class VoiceAssistant {
         this.displayPatientConsc.value = p.consciousness || 'A';
         this.displayPatientGlucose.value = p.glucose !== undefined ? p.glucose : '';
         this.displayPatientPain.value = p.pain_eva !== undefined ? p.pain_eva : '';
+        if (this.displayPatientTemp) this.displayPatientTemp.value = p.temperature !== undefined ? p.temperature : '';
         const genderText = p.gender === '0' || p.gender === 0 ? 'Homme' :
             (p.gender === '1' || p.gender === 1 ? 'Femme' : 'Non spécifié');
         this.displayPatientGender.textContent = genderText;
@@ -917,6 +924,7 @@ class VoiceAssistant {
         this.displayPatientConsc.value = 'A';
         this.displayPatientGlucose.value = '';
         this.displayPatientPain.value = '';
+        if (this.displayPatientTemp) this.displayPatientTemp.value = '';
         this.patientSearch.focus();
         this.validatePatientData();
     }
@@ -1031,14 +1039,29 @@ class VoiceAssistant {
                     validated: true
                 }));
             console.log(`[AI Analysis] Sending ${selectedEntities.length} validated entities.`);
+            const patientClinicalData = this.selectedPatient ? `
+[DONNÉES CLINIQUES DU PATIENT (Issues du formulaire de triage)]
+- Âge : ${this.selectedPatient.age !== undefined ? this.selectedPatient.age + ' ans' : 'Non spécifié'}
+- Genre : ${this.selectedPatient.gender === 0 ? 'Homme' : (this.selectedPatient.gender === 1 ? 'Femme' : 'Non spécifié')}
+- Poids : ${this.displayPatientWeight?.value ? this.displayPatientWeight.value + ' kg' : 'Non spécifié'}
+- Taille : ${this.displayPatientHeight?.value ? this.displayPatientHeight.value + ' cm' : 'Non spécifié'}
+- Température : ${this.displayPatientTemp?.value ? this.displayPatientTemp.value + ' °C' : 'Non spécifié'}
+- Fréquence Resp. : ${this.displayPatientResp?.value ? this.displayPatientResp.value + ' /min' : 'Non spécifié'}
+- Conscience : ${this.displayPatientConsc?.value || 'A'}
+- Glycémie : ${this.displayPatientGlucose?.value ? this.displayPatientGlucose.value + ' g/L' : 'Non spécifié'}
+- Douleur (EVA) : ${this.displayPatientPain?.value ? this.displayPatientPain.value + ' /10' : 'Non spécifié'}
+- Antécédents : ${this.selectedPatient.history || 'Aucun spécifié'}
+` : '';
+
             const payload = {
-                context: `${text}\n\n[INSTRUCTION MÉDICALE : 
-1. Identifie les PIÈGES À ÉVITER (pitfalls).
-2. Propose un DIAGNOSTIC DIFFÉRENTIEL (differential_diagnosis).
-3. Extrais les CODES CIM-10 pour chaque diagnostic suspecté.
-4. Extrais les CODES LOINC pour les examens de laboratoire suggérés.
-5. Liste également tous les EXAMENS COMPLÉMENTAIRES (imagerie, biologie) suggérés dans un champ 'exams'.
-6. Structure le résultat avec un 'form_schema' incluant ces codes et examens. Les champs CIM-10 et LOINC doivent être de type 'autocomplete' avec repeatable: true.]`,
+                context: `${text}\n\n${patientClinicalData}\n[INSTRUCTION MÉDICALE : 
+1. Prends impérativement en compte les DONNÉES CLINIQUES DU PATIENT ci-dessus (âge, température, constantes vitales, douleur) pour affiner ton analyse, écarter ou prioriser certaines hypothèses.
+2. Identifie les PIÈGES À ÉVITER (pitfalls) en lien direct avec ces constantes (ex: risque de sepsis si fièvre + tachypnée).
+3. Propose un DIAGNOSTIC DIFFÉRENTIEL (differential_diagnosis) hiérarchisé et affiné selon le profil et les constantes du patient.
+4. Extrais les CODES CIM-10 pour chaque diagnostic suspecté.
+5. Extrais les CODES LOINC pour les examens de laboratoire suggérés.
+6. Liste également tous les EXAMENS COMPLÉMENTAIRES (imagerie, biologie) suggérés dans un champ 'exams'.
+7. Structure le résultat avec un 'form_schema' incluant ces codes et examens. Les champs CIM-10 et LOINC doivent être de type 'autocomplete' avec repeatable: true.]`,
                 entities: selectedEntities,
                 mode: this.getAIModeShortLabel().toLowerCase(),
                 age: this.selectedPatient ? this.selectedPatient.age : "N/A",
@@ -1050,12 +1073,14 @@ class VoiceAssistant {
                     name: this.selectedPatient.name,
                     age: this.selectedPatient.age,
                     gender: this.selectedPatient.gender === 0 ? 'Homme' : 'Femme',
-                    weight: this.displayPatientWeight.value,
-                    height: this.displayPatientHeight.value,
-                    blood: this.displayPatientBlood.value,
-                    resp_rate: this.displayPatientResp.value,
-                    consciousness: this.displayPatientConsc.value,
-                    pain_eva: this.displayPatientPain.value
+                    weight: this.displayPatientWeight?.value,
+                    height: this.displayPatientHeight?.value,
+                    blood: this.displayPatientBlood?.value,
+                    resp_rate: this.displayPatientResp?.value,
+                    consciousness: this.displayPatientConsc?.value,
+                    glucose: this.displayPatientGlucose?.value,
+                    pain_eva: this.displayPatientPain?.value,
+                    temperature: this.displayPatientTemp ? this.displayPatientTemp.value : undefined
                 } : null
             };
             // Transition vers l'analyse médicale après un court délai simulé pour la fluidité
@@ -1445,6 +1470,20 @@ class VoiceAssistant {
         loaderProgress.style.width = '5%';
         const formData = new FormData();
         formData.append('file', audioBlob, 'clinic_dictation.webm');
+        if (this.selectedPatient) {
+            formData.append('patient_id', this.selectedPatient.id);
+            formData.append('patient_name', this.selectedPatient.name);
+            formData.append('patient_age', this.selectedPatient.age);
+            formData.append('patient_gender', this.selectedPatient.gender);
+            formData.append('patient_weight', this.displayPatientWeight?.value || '');
+            formData.append('patient_height', this.displayPatientHeight?.value || '');
+            formData.append('patient_temp', this.displayPatientTemp?.value || '');
+            formData.append('patient_resp', this.displayPatientResp?.value || '');
+            formData.append('patient_consc', this.displayPatientConsc?.value || 'A');
+            formData.append('patient_pain', this.displayPatientPain?.value || '');
+            formData.append('patient_glucose', this.displayPatientGlucose?.value || '');
+            formData.append('context_prompt', `Prends impérativement en compte les constantes vitales du patient (Poids: ${this.displayPatientWeight?.value || '?'}kg, Température: ${this.displayPatientTemp?.value || '?'}°C, Douleur EVA: ${this.displayPatientPain?.value || '?'}/10) pour affiner le diagnostic différentiel.`);
+        }
         try {
             const response = await api.post('/api/external/triage/voice', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
