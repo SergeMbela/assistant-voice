@@ -92,6 +92,12 @@ class VoiceAssistant {
         this.aiStatusIndicator = document.getElementById('ai-status-indicator');
         this.aiModeToggle = document.getElementById('ai-mode-toggle');
         this.aiModeText = document.getElementById('ai-mode-text');
+        this.transcriptionModeToggle = document.getElementById('transcription-mode-toggle');
+        this.transcriptionModeText = document.getElementById('transcription-mode-text');
+        this.useWhisper = localStorage.getItem('use_whisper') === 'true';
+        if (this.transcriptionModeToggle) {
+            this.transcriptionModeToggle.checked = this.useWhisper;
+        }
         // Vision Tool Elements
         this.visionBtn = document.getElementById('vision-btn');
         this.visionUploadContainer = document.getElementById('vision-upload-container');
@@ -128,6 +134,7 @@ class VoiceAssistant {
         this.audioContext = null;
         this.analyser = null;
         this.animationId = null;
+        this.initialTranscriptionVal = "";
         // Validation Modal Elements
         this.validationModal = document.getElementById('validation-modal');
         this.missingFieldsList = document.getElementById('missing-fields-list');
@@ -163,6 +170,7 @@ class VoiceAssistant {
     }
     async init() {
         this.setupSpeechRecognition();
+        this.updateTranscriptionModeText();
         this.bindEvents();
         this.setupPromptModal();
         this.fetchPatients();
@@ -326,21 +334,24 @@ class VoiceAssistant {
         };
 
         this.recognition.onresult = (event) => {
+            let finalTranscript = '';
             let interimTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            for (let i = 0; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    if (this.transcriptionDiv.value.includes("Cliquez sur le micro")) {
-                        this.transcriptionDiv.value = "";
-                    }
-                    const currentVal = this.transcriptionDiv.value.trim();
-                    this.transcriptionDiv.value = currentVal + (currentVal ? ' ' : '') + transcript;
+                    finalTranscript += (finalTranscript ? ' ' : '') + transcript;
                 } else {
                     interimTranscript += transcript;
                 }
             }
+
+            const baseText = this.initialTranscriptionVal || '';
+            this.transcriptionDiv.value = baseText + (baseText && finalTranscript ? ' ' : '') + finalTranscript;
+
             if (interimTranscript) {
                 this.statusDiv.textContent = "Transcription : " + interimTranscript;
+            } else {
+                this.statusDiv.textContent = "Écoute en cours (Transcription locale)...";
             }
             this.updateAnalyzeButtonState();
         };
@@ -442,6 +453,20 @@ class VoiceAssistant {
         if (this.aiModeToggle) {
             this.aiModeToggle.addEventListener('change', (e) => {
                 this.switchAIMode(e.target.checked);
+            });
+        }
+        // Transcription Mode Toggle
+        if (this.transcriptionModeToggle) {
+            this.transcriptionModeToggle.addEventListener('change', (e) => {
+                this.useWhisper = e.target.checked;
+                localStorage.setItem('use_whisper', this.useWhisper ? 'true' : 'false');
+                this.updateTranscriptionModeText();
+                
+                // Mettre à jour le message d'état si on n'enregistre pas actuellement
+                if (!this.isRecording) {
+                    this.statusDiv.textContent = `Moteur dictée : ${this.useWhisper ? 'Whisper Cloud' : 'Reconnaissance locale'}`;
+                    this.statusDiv.style.color = "var(--text-muted)";
+                }
             });
         }
         this.micBtn.addEventListener('click', (e) => {
@@ -1028,33 +1053,88 @@ class VoiceAssistant {
     async startRecording() {
         console.log("Démarrage de la capture vocale...");
         try {
-            // 1. Démarrer la reconnaissance vocale immédiatement (synchrone) pour conserver le geste utilisateur (mobile)
-            if (this.recognition) {
-                this.recognition.start();
+            // Déterminer la valeur initiale de la transcription (en ignorant le placeholder)
+            const currentVal = this.transcriptionDiv.value || '';
+            if (currentVal.includes("Cliquez sur le micro") || currentVal.includes("commencer à dicter")) {
+                this.transcriptionDiv.value = "";
+                this.initialTranscriptionVal = "";
+            } else {
+                this.initialTranscriptionVal = currentVal.trim();
             }
-            this.isRecording = true;
-            this.micBtn.classList.add('recording');
-            this.visionBtn.classList.add('hidden');
-            this.stopBtn.classList.remove('hidden');
-            this.visualizer.classList.add('active');
-            this.transcriptionDiv.classList.add('active');
-            this.statusDiv.textContent = "Écoute en cours (Transcription locale)...";
-            this.statusDiv.style.color = "var(--primary)";
 
-            // 2. Détecter si on est sur mobile/iOS pour éviter les conflits d'audio / micro avec getUserMedia
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-            
-            if (!isIOS && !isMobile) {
+            if (this.useWhisper) {
+                this.isRecording = true;
+                this.micBtn.classList.add('recording');
+                this.visionBtn.classList.add('hidden');
+                this.stopBtn.classList.remove('hidden');
+                this.visualizer.classList.add('active');
+                this.transcriptionDiv.classList.add('active');
+                this.statusDiv.textContent = "Initialisation du micro (Whisper)...";
+                this.statusDiv.style.color = "var(--primary)";
+
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    // Initialisation du visualiseur
+                    this.mediaStream = stream;
                     this.setupVisualizer(stream);
-                } catch (visualizerErr) {
-                    console.warn("Le visualiseur n'a pas pu démarrer (non-bloquant):", visualizerErr);
+
+                    this.audioChunks = [];
+                    let options = {};
+                    if (typeof MediaRecorder !== 'undefined') {
+                        if (MediaRecorder.isTypeSupported('audio/webm')) {
+                            options = { mimeType: 'audio/webm' };
+                        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                            options = { mimeType: 'audio/mp4' };
+                        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                            options = { mimeType: 'audio/ogg' };
+                        }
+                    }
+                    
+                    this.mediaRecorder = new MediaRecorder(stream, options);
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data && event.data.size > 0) {
+                            this.audioChunks.push(event.data);
+                        }
+                    };
+                    this.mediaRecorder.onstop = async () => {
+                        await this.uploadAudioForWhisper();
+                    };
+                    this.mediaRecorder.start(250);
+                    this.statusDiv.textContent = "Écoute en cours (Transcription Whisper)...";
+                } catch (err) {
+                    console.error("Erreur de capture audio Whisper:", err);
+                    this.statusDiv.textContent = "Erreur micro (Whisper)";
+                    this.stopRecording();
                 }
             } else {
-                console.log("Mobile/iOS détecté : désactivation du visualiseur audio pour éviter les conflits d'accès microphone.");
+                // 1. Démarrer la reconnaissance vocale immédiatement (synchrone) pour conserver le geste utilisateur (mobile)
+                if (this.recognition) {
+                    this.recognition.start();
+                }
+                this.isRecording = true;
+                this.micBtn.classList.add('recording');
+                this.visionBtn.classList.add('hidden');
+                this.stopBtn.classList.remove('hidden');
+                this.visualizer.classList.add('active');
+                this.transcriptionDiv.classList.add('active');
+                this.statusDiv.textContent = "Écoute en cours (Transcription locale)...";
+                this.statusDiv.style.color = "var(--primary)";
+
+                // 2. Détecter si on est sur mobile/iOS pour éviter les conflits d'audio / micro avec getUserMedia
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+                
+                if (!isIOS && !isMobile) {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        this.mediaStream = stream;
+                        // Initialisation du visualiseur
+                        this.setupVisualizer(stream);
+                    } catch (visualizerErr) {
+                        console.warn("Le visualiseur n'a pas pu démarrer (non-bloquant):", visualizerErr);
+                    }
+                } else {
+                    console.log("Mobile/iOS détecté : désactivation du visualiseur audio pour éviter les conflits d'accès microphone.");
+                }
             }
         } catch (err) {
             console.error("Erreur de capture vocale:", err);
@@ -1088,6 +1168,9 @@ class VoiceAssistant {
         this.visionBtn.classList.remove('hidden');
         this.stopBtn.classList.add('hidden');
         this.visualizer.classList.remove('active');
+        if (this.visualizer) {
+            this.visualizer.style.transform = '';
+        }
         if (this.audioContext) {
             try {
                 this.audioContext.close();
@@ -1103,7 +1186,84 @@ class VoiceAssistant {
         if (this.recognition) {
             this.recognition.stop();
         }
+        // Arrêter le MediaRecorder s'il est actif
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            try {
+                this.mediaRecorder.stop();
+            } catch (e) {
+                console.error("Erreur lors de l'arrêt du MediaRecorder:", e);
+            }
+        }
+        // Libérer le flux microphone
+        if (this.mediaStream) {
+            try {
+                this.mediaStream.getTracks().forEach(track => track.stop());
+            } catch (e) {
+                console.error("Erreur lors de la fermeture des pistes audio:", e);
+            }
+            this.mediaStream = null;
+        }
         this.statusDiv.textContent = "Prêt";
+    }
+    async uploadAudioForWhisper() {
+        if (!this.audioChunks || this.audioChunks.length === 0) {
+            console.warn("Aucun segment audio capturé.");
+            return;
+        }
+        
+        this.statusDiv.textContent = "Transcription Whisper en cours...";
+        this.statusDiv.style.color = "var(--primary)";
+        
+        const mimeType = (this.mediaRecorder && this.mediaRecorder.mimeType) || 'audio/webm';
+        const extension = mimeType.includes('mp4') ? 'mp4' : (mimeType.includes('ogg') ? 'ogg' : 'webm');
+        const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+        
+        const formData = new FormData();
+        formData.append('file', audioBlob, `whisper_dictation.${extension}`);
+        
+        try {
+            const response = await api.post('/api/external/transcribe', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            console.log("Response Whisper API:", response.data);
+            
+            let text = "";
+            if (response.data) {
+                if (typeof response.data === 'string') {
+                    text = response.data;
+                } else if (response.data.text !== undefined) {
+                    text = response.data.text;
+                } else if (response.data.transcription !== undefined) {
+                    text = response.data.transcription;
+                } else if (response.data.result !== undefined) {
+                    text = response.data.result;
+                } else if (response.data.transcript !== undefined) {
+                    text = response.data.transcript;
+                } else if (typeof response.data.data === 'string') {
+                    text = response.data.data;
+                } else if (response.data.data && response.data.data.text !== undefined) {
+                    text = response.data.data.text;
+                }
+            }
+            
+            if (text && text.trim()) {
+                const baseText = this.initialTranscriptionVal || '';
+                this.transcriptionDiv.value = baseText + (baseText ? ' ' : '') + text.trim();
+                this.statusDiv.textContent = "Transcription Whisper terminée";
+                this.statusDiv.style.color = "var(--success)";
+            } else {
+                this.statusDiv.textContent = "Aucune parole détectée par Whisper";
+                this.statusDiv.style.color = "var(--accent)";
+            }
+            
+            this.updateAnalyzeButtonState();
+        } catch (error) {
+            console.error("Erreur transcription Whisper:", error);
+            this.statusDiv.textContent = "Échec transcription Whisper";
+            this.statusDiv.style.color = "var(--accent)";
+            alert("Échec de la transcription Whisper. Veuillez vérifier la connexion.");
+        }
     }
     /**
      * Analyse clinique via le Pipeline Raffiné (Mistral + MedGemma)
@@ -1424,6 +1584,10 @@ class VoiceAssistant {
         const label = this.aiStatusIndicator.querySelector('.status-text');
         dot.className = `status-dot ${state}`;
         label.textContent = text || (this.aiModeText ? this.aiModeText.textContent : 'IA Ready');
+    }
+    updateTranscriptionModeText() {
+        if (!this.transcriptionModeText) return;
+        this.transcriptionModeText.textContent = this.useWhisper ? "Dictée : Whisper" : "Dictée : Locale";
     }
     getAIModeName() {
         return (this.aiModeToggle && this.aiModeToggle.checked) ? 'Llama 70B' : 'MedGemma';
