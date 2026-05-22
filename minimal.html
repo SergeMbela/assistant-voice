@@ -733,21 +733,32 @@
                 refineBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Raffinage...';
 
                 try {
-                    // On utilise l'endpoint de raffinage/analyse mais avec une instruction spécifique
-                    const response = await fetch('/api/external/triage/refined-analyze', {
-                        method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'X-API-Key': '8300e795-30ad-4c9d-9a04-95d8986ac823'
-                        },
-                        body: JSON.stringify({ 
+                    let data;
+                    if (window.api) {
+                        // Utilisation de l'instance Axios globale pour respecter l'URL du backend et la clé d'API
+                        const response = await window.api.post('/api/external/triage/refined-analyze', {
                             context: text,
                             instruction: "Corrige uniquement l'orthographe et la ponctuation médicale de ce texte, sans faire d'analyse diagnostique. Reste fidèle au sens original.",
                             mode: 'cloud' // Force le cloud pour un nettoyage haute qualité
-                        })
-                    });
+                        });
+                        data = response.data;
+                    } else {
+                        // Fallback vers fetch standard si window.api n'est pas encore disponible
+                        const response = await fetch('/api/external/triage/refined-analyze', {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'X-API-Key': '8300e795-30ad-4c9d-9a04-95d8986ac823'
+                            },
+                            body: JSON.stringify({ 
+                                context: text,
+                                instruction: "Corrige uniquement l'orthographe et la ponctuation médicale de ce texte, sans faire d'analyse diagnostique. Reste fidèle au sens original.",
+                                mode: 'cloud' // Force le cloud pour un nettoyage haute qualité
+                            })
+                        });
+                        data = await response.json();
+                    }
 
-                    const data = await response.json();
                     if (data && data.refined_text) {
                         transcription.value = data.refined_text;
                         transcription.dispatchEvent(new Event('input', { bubbles: true }));

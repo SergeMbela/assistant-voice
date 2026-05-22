@@ -4011,3 +4011,349 @@ footer {
 .animate-slide-up {
     animation: slideUp 0.6s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN / MOBILE COMPATIBILITY (max-width: 768px)
+   ═══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* --- General Layout & Spacing --- */
+    .app-container {
+        padding: 1rem 0.75rem;
+    }
+
+    main {
+        gap: 2rem;
+    }
+
+    /* --- Header & Navigation --- */
+    header {
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: center;
+        margin-bottom: 2.5rem;
+        text-align: center;
+    }
+
+    .logo {
+        justify-content: center;
+    }
+
+    .header-actions {
+        flex-direction: column;
+        gap: 1.25rem;
+        width: 100%;
+        align-items: center;
+    }
+
+    .patient-selector-container {
+        width: 100%;
+        justify-content: center;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .patient-selector-container label {
+        font-size: 0.9rem;
+    }
+
+    .autocomplete {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .ai-status {
+        margin-right: 0;
+        justify-content: center;
+        width: fit-content;
+    }
+
+    /* --- Patient Info Display Card --- */
+    .patient-card.glass {
+        flex-direction: column;
+        gap: 1.5rem;
+        padding: 1.5rem 1rem;
+        align-items: center;
+        text-align: center;
+        border-radius: 20px;
+    }
+
+    .patient-avatar {
+        width: 70px;
+        height: 70px;
+        font-size: 1.5rem;
+        border-radius: 18px;
+    }
+
+    .patient-details {
+        width: 100%;
+    }
+
+    .patient-name-row {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .patient-meta-row {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .meta-item {
+        justify-content: center;
+    }
+
+    .mini-input, .mini-select {
+        width: 75px;
+    }
+
+    /* --- Voice & Recording Center --- */
+    .voice-command-center {
+        padding: 0 0.5rem;
+    }
+
+    .visualizer-container {
+        width: 100%;
+        max-width: 280px;
+        gap: 1.5rem;
+    }
+
+    .transcription-preview {
+        font-size: 1rem;
+        padding: 1rem;
+        min-height: 100px;
+    }
+
+    .transcription-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    .transcription-actions .btn {
+        width: 100%;
+        justify-content: center;
+        padding: 0.9rem 1.5rem;
+        font-size: 0.95rem;
+    }
+
+    .analyze-btn {
+        padding: 0.9rem 1.5rem;
+        font-size: 0.95rem;
+        justify-content: center;
+    }
+
+    /* --- DICOM Player & Vision Preview --- */
+    .dicom-viewport {
+        height: 350px; /* Reduced viewport height on mobile to save vertical space */
+    }
+
+    .player-toolbar {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: center;
+        padding: 0.75rem;
+    }
+
+    .tool-group {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .player-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+    }
+
+    .player-actions button, .player-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .series-browser {
+        max-height: 180px;
+    }
+
+    .series-nav {
+        padding: 0.5rem;
+    }
+
+    .glass-upload-zone {
+        padding: 2rem 1rem;
+    }
+
+    .upload-text h3 {
+        font-size: 1.1rem;
+    }
+
+    .format-badges {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* --- View Tabs & Form Validation --- */
+    .card.glass {
+        padding: 1.25rem 1rem;
+        border-radius: 20px;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .card-header h2 {
+        font-size: 1.3rem;
+    }
+
+    /* Modern horizontal scrolling tabs for mobile */
+    .view-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        justify-content: flex-start;
+        width: 100%;
+        padding: 0.3rem;
+        scrollbar-width: none; /* Hide scrollbar Firefox */
+        -webkit-overflow-scrolling: touch; /* Smooth iOS momentum scrolling */
+    }
+
+    .view-tabs::-webkit-scrollbar {
+        display: none; /* Hide scrollbar Webkit */
+    }
+
+    .tab-btn {
+        padding: 0.45rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .form-section-glass {
+        padding: 1.25rem 1rem;
+        margin-bottom: 1.5rem;
+        border-radius: 16px;
+    }
+
+    .form-section-glass h4 {
+        font-size: 1.1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .glass-input-premium {
+        padding: 0.8rem 1rem;
+    }
+
+    /* Medication entries reflow */
+    .medication-entry-glass {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .medication-entry-glass .btn-remove {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    /* Medical Report Paper scaling */
+    .medical-report-paper {
+        padding: 1rem !important;
+        border-radius: 8px;
+    }
+
+    .report-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .report-footer {
+        flex-direction: column;
+        gap: 1.5rem;
+        align-items: center;
+        text-align: center;
+    }
+
+    .footer-note {
+        max-width: 100%;
+    }
+
+    .form-actions {
+        flex-direction: column-reverse;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    /* --- Modals & Dialogs --- */
+    .modal-content.glass {
+        padding: 1.5rem 1.25rem;
+        border-radius: 20px;
+    }
+
+    .modal-header h3 {
+        font-size: 1.2rem;
+    }
+
+    .prompt-text-card {
+        padding: 1rem;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-actions {
+        flex-direction: column-reverse;
+        width: 100%;
+        gap: 0.75rem;
+    }
+
+    .modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    /* Side-panel modal takes full width on mobile */
+    .modal.side-panel {
+        width: 100vw;
+    }
+
+    .modal.side-panel .modal-content {
+        border-radius: 0;
+        width: 100vw;
+        height: 100vh;
+    }
+}
+
+/* Extra small mobile adjustments */
+@media (max-width: 480px) {
+    .patient-meta-row {
+        gap: 0.5rem 0.75rem;
+    }
+    
+    .meta-item {
+        font-size: 0.8rem;
+    }
+
+    .patient-avatar {
+        width: 60px;
+        height: 60px;
+        font-size: 1.3rem;
+    }
+}

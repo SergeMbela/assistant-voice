@@ -10,6 +10,7 @@ export class DynamicFormManager {
             : containerOrId;
 
         this.options = {
+            baseUrl: options.baseUrl || '',
             externalApiUrl: options.externalApiUrl || '',
             apiKey: options.apiKey || '', // Ajout du support de l'API Key
             onStateChange: options.onStateChange || null,
@@ -523,8 +524,9 @@ export class DynamicFormManager {
                 headers['X-API-Key'] = this.options.apiKey;
             }
 
+            const baseUrl = this.options.baseUrl || '';
             const response = await fetch(
-                `${field.source}${separator}q=${encodeURIComponent(query)}`,
+                `${baseUrl}${field.source}${separator}q=${encodeURIComponent(query)}`,
                 { 
                     signal: this.autocompleteAbortController.signal,
                     headers: headers
@@ -798,7 +800,9 @@ export class DynamicFormManager {
                 headers['X-API-Key'] = this.options.apiKey;
             }
 
-            const response = await fetch(this.options.externalApiUrl, {
+            const baseUrl = this.options.baseUrl || '';
+            const url = this.options.externalApiUrl.startsWith('http') ? this.options.externalApiUrl : `${baseUrl}${this.options.externalApiUrl}`;
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload)

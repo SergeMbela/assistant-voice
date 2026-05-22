@@ -3,13 +3,15 @@ import JSONEditor from '@json-editor/json-editor';
 import { DynamicFormManager } from './js/DynamicFormManager.js';
 const API_KEY = '8300e795-30ad-4c9d-9a04-95d8986ac823';
 const VOICE_API_KEY = '8300e795-30ad-4c9d-9a04-95d8986ac823';
+const BACKEND_URL = import.meta.env.DEV ? '' : 'https://api.meddocta.com';
 // Instance API centralisée avec Axios
 const api = axios.create({
-    baseURL: '', // Utilise le proxy Vite (/api) pour éviter les erreurs CORS
+    baseURL: BACKEND_URL, // Utilise le proxy Vite (/api) en dev pour éviter les CORS, et l'URL de prod sinon
     headers: {
         'X-API-Key': VOICE_API_KEY
     }
 });
+window.api = api; // Exposer globalement pour d'autres pages/scripts
 // Helper pour le debounce
 function debounce(func, wait) {
     let timeout;
@@ -33,6 +35,7 @@ class VoiceAssistant {
         this.statusDiv = document.getElementById('connection-status');
         // Moteur de formulaire dynamique (schéma JSON)
         this.formEngine = new DynamicFormManager('medical-form', {
+            baseUrl: BACKEND_URL,
             externalApiUrl: '/api/external/triage',
             apiKey: VOICE_API_KEY,
             onStateChange: (fieldId, value, state) => {
@@ -359,9 +362,9 @@ class VoiceAssistant {
         `;
         this.verificationResultsDiv.classList.remove('hidden');
         try {
-            // Utilisation du nouvel endpoint sémantique MedGemma
+            // Utilisation du nouvel endpoint semantique MedGemma (limite a 400 caracteres pour eviter l erreur HTTP 431 Request Header Too Large)
             const response = await api.get(`/api/medical/search/semantic`, {
-                params: { q: text, limit: 12 }
+                params: { q: text ? text.slice(0, 400) : '', limit: 12 }
             });
             const results = response.data;
             this.currentMatches = results.results || results.matches || results.suggestions || results.points || (Array.isArray(results) ? results : []);
@@ -1138,6 +1141,44 @@ class VoiceAssistant {
             });
             const finalData = response.data;
             this.lastAnalysisData = finalData;
+
+            // Construction du payload pour l'enregistrement de session et le webhook de monitoring
+            try {
+                const prioriteLvl = finalData.priority?.level || (finalData.news2_score >= 7 ? 1 : finalData.news2_score >= 5 ? 2 : 3);
+                const ageParsed = this.selectedPatient && this.selectedPatient.age !== undefined ? parseInt(this.selectedPatient.age) : null;
+                const weightParsed = this.displayPatientWeight && this.displayPatientWeight.value ? parseFloat(this.displayPatientWeight.value) : null;
+
+                const customPayload = {
+                    patient_age: isNaN(ageParsed) ? null : ageParsed,
+                    patient_sexe: this.selectedPatient ? (this.selectedPatient.gender === 0 || this.selectedPatient.gender === '0' ? 'M' : 'F') : null,
+                    patient_poids: isNaN(weightParsed) ? null : weightParsed,
+                    priorite_triage: prioriteLvl === 1 ? 'URGENCE' : (prioriteLvl === 2 ? 'RELATIF' : 'STABLE'),
+                    niveau_fosa: "Niveau 2", // TODO: À adapter si dynamique
+                    motif_consultation: text ? text.substring(0, 200) : "", // Extrait du texte en motif
+                    score_confiance_ia: finalData.confidence_score || 95,
+                    texte_original: text || "",
+                    analyse_json: finalData // Le JSON complet de l'analyse IA
+                };
+
+                // 1. Enregistrement de la session IA (correctement typée avec AiTriageSessionCreate)
+                try {
+                    const aiSessionResponse = await api.post('/api/external/triage/ai-sessions', customPayload);
+                    console.log("✅ Session IA sauvegardée avec succès :", aiSessionResponse.data);
+                } catch (err) {
+                    console.error("Erreur lors de l'enregistrement de la session IA:", err);
+                }
+
+                // 2. Envoi du résultat IA au webhook de monitoring (correctement routée sur l'API)
+                try {
+                    const customResponse = await api.post('/api/external/monitoring/webhook', customPayload);
+                    console.log("✅ Résultat métier formaté envoyé avec succès au webhook :", customResponse.data);
+                } catch (err) {
+                    console.error("Erreur lors de l'envoi du résultat métier formaté au webhook:", err);
+                }
+            } catch (err) {
+                console.error("Erreur lors du traitement et de la publication des résultats IA:", err);
+            }
+
             // Affichage du JSON brut pour le "Human in the Loop"
             const responseContainer = document.getElementById('api-response-container');
             const responseContent = document.getElementById('api-response-content');
@@ -1174,9 +1215,19 @@ class VoiceAssistant {
                 console.error('Erreur Pipeline Raffiné:', error);
                 this.statusDiv.textContent = "Erreur de connexion API";
                 this.statusDiv.style.color = "var(--accent)";
-                // Notification visuelle d'échec de clé API ou de serveur
-                if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-                    alert("Erreur d'authentification : Clé API invalide ou expirée.");
+                if (error.response) {
+                    const status = error.response.status;
+                    if (status === 401 || status === 403) {
+                        alert("Erreur d authentification : Cle API invalide ou expiree.");
+                    } else if (status === 524 || status === 504) {
+                        alert("Le serveur IA a mis trop de temps a repondre (Timeout " + status + ").\n\nCe delai est generalement du a une surcharge temporaire du serveur ou a un texte d analyse tres long. Veuillez reessayer dans quelques instants.");
+                    } else if (status >= 500) {
+                        alert("Erreur interne du serveur IA (" + status + ").\n\nLe backend a rencontre un probleme lors du traitement de la requete. Veuillez verifier votre connexion ou reessayer plus tard.");
+                    } else {
+                        alert("Erreur API (" + status + ") : Impossible de finaliser l analyse.");
+                    }
+                } else if (error.request) {
+                    alert("Erreur reseau : Impossible de joindre le serveur IA. Veuillez verifier votre connexion internet.");
                 }
             }
         } finally {
@@ -1233,6 +1284,29 @@ class VoiceAssistant {
             });
             const finalData = response.data;
             this.lastAnalysisData = finalData;
+
+            // Enregistrement de la réponse générée par l'IA (correctement typée avec AiTriageSessionCreate)
+            try {
+                const ageParsed = this.selectedPatient && this.selectedPatient.age !== undefined ? parseInt(this.selectedPatient.age) : null;
+                const weightParsed = this.displayPatientWeight && this.displayPatientWeight.value ? parseFloat(this.displayPatientWeight.value) : null;
+
+                const aiSessionPayload = {
+                    patient_age: isNaN(ageParsed) ? null : ageParsed,
+                    patient_sexe: this.selectedPatient ? (this.selectedPatient.gender === 0 || this.selectedPatient.gender === '0' ? 'M' : 'F') : null,
+                    patient_poids: isNaN(weightParsed) ? null : weightParsed,
+                    priorite_triage: 'STABLE', // Par défaut pour actes et règles
+                    niveau_fosa: "Niveau 2",
+                    motif_consultation: text ? text.substring(0, 200) : "",
+                    score_confiance_ia: 95,
+                    texte_original: text || "",
+                    analyse_json: finalData
+                };
+
+                const aiSessionResponse = await api.post('/api/external/triage/ai-sessions', aiSessionPayload);
+                console.log("✅ Session IA sauvegardée avec succès :", aiSessionResponse.data);
+            } catch (err) {
+                console.error("Erreur lors de l'enregistrement de la session IA:", err);
+            }
 
             // Affichage du JSON brut pour le "Human in the Loop"
             const responseContainer = document.getElementById('api-response-container');
