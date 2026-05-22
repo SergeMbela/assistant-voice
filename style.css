@@ -326,13 +326,19 @@ main {
     background: #f0f0f0;
 }
 
+.transcription-container {
+    position: relative;
+    width: 100%;
+    margin-top: 1.5rem;
+}
+
 .transcription-preview {
     width: 100%;
     font-size: 1.1rem;
     color: var(--text-muted);
     min-height: 120px;
     line-height: 1.6;
-    padding: 1.5rem;
+    padding: 1.5rem 3.5rem 1.5rem 1.5rem;
     background: var(--card-bg);
     border-radius: 16px;
     border: 1px solid var(--glass-border);
@@ -340,7 +346,7 @@ main {
     font-family: var(--font-family);
     resize: vertical;
     outline: none;
-    margin-top: 1.5rem;
+    margin-top: 0;
 }
 
 .transcription-preview:focus {
@@ -348,6 +354,43 @@ main {
     background: rgba(255, 255, 255, 0.05);
     box-shadow: 0 0 20px rgba(0, 242, 254, 0.1);
     color: var(--text-main);
+}
+
+.clear-transcription-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.clear-transcription-btn:hover {
+    background: rgba(255, 71, 87, 0.2);
+    border-color: rgba(255, 71, 87, 0.4);
+    color: #ff4757;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 71, 87, 0.2);
+}
+
+.clear-transcription-btn:active {
+    transform: scale(0.95);
+}
+
+.clear-transcription-btn svg {
+    width: 18px;
+    height: 18px;
 }
 
 /* Form Styles */
@@ -4122,7 +4165,7 @@ footer {
 
     .transcription-preview {
         font-size: 1rem;
-        padding: 1rem;
+        padding: 1rem 3rem 1rem 1rem;
         min-height: 100px;
     }
 

@@ -32,6 +32,7 @@ class VoiceAssistant {
         this.resultContainer = document.getElementById('result-container');
         this.medicalForm = document.getElementById('medical-form');
         this.statusDiv = document.getElementById('connection-status');
+        this.clearTranscriptionBtn = document.getElementById('clear-transcription-btn');
         // Moteur de formulaire dynamique (schéma JSON)
         this.formEngine = new DynamicFormManager('medical-form', {
             baseUrl: BACKEND_URL,
@@ -466,6 +467,25 @@ class VoiceAssistant {
             this.resultContainer.classList.add('hidden');
             this.transcriptionDiv.value = "Cliquez sur le micro pour recommencer...";
         });
+        if (this.clearTranscriptionBtn) {
+            this.clearTranscriptionBtn.addEventListener('click', () => {
+                this.transcriptionDiv.value = "";
+                this.transcriptionDiv.focus();
+                this.updateAnalyzeButtonState();
+                
+                // Vider et masquer les résultats sémantiques précédents
+                if (this.verificationResultsDiv) {
+                    this.verificationResultsDiv.innerHTML = "";
+                    this.verificationResultsDiv.classList.add('hidden');
+                }
+                if (this.vectorJsonContainer) {
+                    this.vectorJsonContainer.classList.add('hidden');
+                }
+                if (this.vectorJsonContent) {
+                    this.vectorJsonContent.textContent = "";
+                }
+            });
+        }
         this.medicalForm.addEventListener('submit', (e) => {
             e.preventDefault();
             this.submitForm();
