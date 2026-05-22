@@ -302,6 +302,28 @@ class VoiceAssistant {
         this.recognition.lang = 'fr-FR';
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
+
+        this.recognition.onstart = () => {
+            console.log("Speech recognition started");
+        };
+
+        this.recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+            if (event.error === 'not-allowed') {
+                this.statusDiv.textContent = "Erreur: Accès micro refusé";
+            } else {
+                this.statusDiv.textContent = "Erreur transcription: " + event.error;
+            }
+            this.stopRecording();
+        };
+
+        this.recognition.onend = () => {
+            console.log("Speech recognition ended");
+            if (this.isRecording) {
+                this.stopRecording();
+            }
+        };
+
         this.recognition.onresult = (event) => {
             let interimTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -986,21 +1008,38 @@ class VoiceAssistant {
     async startRecording() {
         console.log("Démarrage de la capture vocale...");
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Initialisation du visualiseur (via AudioContext au lieu de MediaRecorder)
-            this.setupVisualizer(stream);
+            // 1. Démarrer la reconnaissance vocale immédiatement (synchrone) pour conserver le geste utilisateur (mobile)
+            if (this.recognition) {
+                this.recognition.start();
+            }
             this.isRecording = true;
             this.micBtn.classList.add('recording');
             this.visionBtn.classList.add('hidden');
             this.stopBtn.classList.remove('hidden');
             this.visualizer.classList.add('active');
-            if (this.recognition) this.recognition.start();
             this.transcriptionDiv.classList.add('active');
             this.statusDiv.textContent = "Écoute en cours (Transcription locale)...";
             this.statusDiv.style.color = "var(--primary)";
+
+            // 2. Détecter si on est sur mobile/iOS pour éviter les conflits d'audio / micro avec getUserMedia
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+            
+            if (!isIOS && !isMobile) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // Initialisation du visualiseur
+                    this.setupVisualizer(stream);
+                } catch (visualizerErr) {
+                    console.warn("Le visualiseur n'a pas pu démarrer (non-bloquant):", visualizerErr);
+                }
+            } else {
+                console.log("Mobile/iOS détecté : désactivation du visualiseur audio pour éviter les conflits d'accès microphone.");
+            }
         } catch (err) {
-            console.error("Erreur d'accès au micro:", err);
-            this.statusDiv.textContent = "Erreur: Accès micro refusé";
+            console.error("Erreur de capture vocale:", err);
+            this.statusDiv.textContent = "Erreur: Accès micro refusé ou non supporté";
+            this.stopRecording();
         }
     }
     setupVisualizer(stream) {
@@ -1030,18 +1069,21 @@ class VoiceAssistant {
         this.stopBtn.classList.add('hidden');
         this.visualizer.classList.remove('active');
         if (this.audioContext) {
-            this.audioContext.close();
+            try {
+                this.audioContext.close();
+            } catch (e) {
+                console.error(e);
+            }
+            this.audioContext = null;
         }
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
+            this.animationId = null;
         }
         if (this.recognition) {
-            // On restaure simplement le comportement par défaut ou on nettoie
-            this.recognition.onend = () => {
-                this.statusDiv.textContent = "Prêt";
-            };
             this.recognition.stop();
         }
+        this.statusDiv.textContent = "Prêt";
     }
     /**
      * Analyse clinique via le Pipeline Raffiné (Mistral + MedGemma)
