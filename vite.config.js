@@ -75,6 +75,24 @@ export default defineConfig({
       }
     }
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('axios')) {
+              return 'vendor-axios';
+            }
+            if (id.includes('@json-editor')) {
+              return 'vendor-json-editor';
+            }
+            return 'vendor';
+          }
+        }
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': {
