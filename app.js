@@ -1,5 +1,4 @@
 import axios from 'axios';
-import JSONEditor from '@json-editor/json-editor';
 import { DynamicFormManager } from './js/DynamicFormManager.js';
 const API_KEY = '8300e795-30ad-4c9d-9a04-95d8986ac823';
 const VOICE_API_KEY = '8300e795-30ad-4c9d-9a04-95d8986ac823';
